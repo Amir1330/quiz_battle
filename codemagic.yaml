@@ -93,8 +93,11 @@ workflows:
           - "Internal Testers"
           - "External Testers"
         submit_to_app_store: false
-        release_type: MANUAL
-        expire_build_submitted_for_review: true
+        beta_review_details:
+          demo_account_required: false
+          demo_account_name: ""
+          demo_account_password: ""
+          notes: "Quiz Battle app for testing"
 
       slack:
         channel: '#builds'
