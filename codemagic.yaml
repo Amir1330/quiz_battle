@@ -39,6 +39,211 @@ workflows:
         track: internal
         submit_as_draft: true
 
+  ios-production:
+    name: iOS Production
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.quizbattle.app
+      vars:
+        BUNDLE_ID: "com.quizbattle.app"
+        XCODE_WORKSPACE: "Runner.xcworkspace"
+        XCODE_SCHEME: "Runner"
+        APP_STORE_APP_ID: 123456789 # Replace with your App ID
+
+    triggering:
+      events:
+        - tag
+      branch_patterns:
+        - pattern: 'release/*'
+          include: true
+        - pattern: 'main'
+          include: true
+
+    scripts:
+      - name: Set up keychain
+        script: |
+          keychain initialize
+
+      - name: Fetch signing files
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+
+      - name: Add certificates to keychain
+        script: |
+          keychain add-certificates
+
+      - name: Set up code signing settings
+        script: |
+          xcode-project use-profiles
+
+      - name: Get Flutter packages
+        script: |
+          flutter packages pub get
+
+      - name: Install pods
+        script: |
+          find . -name "Podfile" -execdir pod install \;
+
+      - name: Update build number
+        script: |
+          cd ios
+          agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID") + 1))
+
+      - name: Flutter analyze
+        script: |
+          flutter analyze
+
+      - name: Flutter unit tests
+        script: |
+          flutter test
+
+      - name: Build iOS
+        script: |
+          flutter build ipa \
+            --release \
+            --export-options-plist=/Users/builder/export_options.plist
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+
+    publishing:
+      email:
+        recipients:
+          - amir.1330@mail.ru
+        notify:
+          success: true
+          failure: true
+
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+        beta_groups:
+          - "Internal Testers"
+          - "External Testers"
+        submit_to_app_store: false
+        release_type: MANUAL
+        expire_build_submitted_for_review: true
+
+      slack:
+        channel: '#builds'
+        notify_on_build_start: true
+        notify:
+          success: true
+          failure: true
+
+  ios-development:
+    name: iOS Development
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: development
+        bundle_identifier: com.quizbattle.app.dev
+      vars:
+        BUNDLE_ID: "com.quizbattle.app.dev"
+        XCODE_WORKSPACE: "Runner.xcworkspace"
+        XCODE_SCHEME: "Runner"
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'develop'
+          include: true
+        - pattern: 'feature/*'
+          include: true
+
+    scripts:
+      - name: Set up keychain
+        script: |
+          keychain initialize
+
+      - name: Fetch signing files
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_DEVELOPMENT \
+            --create
+
+      - name: Add certificates to keychain
+        script: |
+          keychain add-certificates
+
+      - name: Set up code signing settings
+        script: |
+          xcode-project use-profiles
+
+      - name: Get Flutter packages
+        script: |
+          flutter packages pub get
+
+      - name: Install pods
+        script: |
+          find . -name "Podfile" -execdir pod install \;
+
+      - name: Flutter analyze
+        script: |
+          flutter analyze
+
+      - name: Flutter unit tests
+        script: |
+          flutter test
+
+      - name: Build iOS
+        script: |
+          flutter build ios --debug --no-codesign
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      email:
+        recipients:
+          - amir.1330@mail.ru
+        notify:
+          success: true
+          failure: true
+
+cache:
+  cache_paths:
+    - $HOME/.pub-cache
+    - $HOME/Library/Caches/CocoaPods
+
+  pull-request-workflow:
+    name: Pull Request Checks
+    max_build_duration: 30
+    environment:
+      flutter: stable
+    scripts:
+      - name: Get Flutter packages
+        script: |
+          flutter packages pub get
+      - name: Flutter analyze
+        script: |
+          flutter analyze
+      - name: Flutter unit tests
+        script: |
+          flutter test
+    publishing:
+      email:
+        recipients:
+          - your.email@example.com
+
   ios-workflow:
     name: iOS Release
     max_build_duration: 60
@@ -128,30 +333,4 @@ workflows:
         notify_on_build_start: true
         notify:
           success: true
-          failure: true
-
-  pull-request-workflow:
-    name: Pull Request Checks
-    max_build_duration: 30
-    environment:
-      flutter: stable
-    scripts:
-      - name: Get Flutter packages
-        script: |
-          flutter packages pub get
-      - name: Flutter analyze
-        script: |
-          flutter analyze
-      - name: Flutter unit tests
-        script: |
-          flutter test
-    publishing:
-      email:
-        recipients:
-          - your.email@example.com
-
-cache:
-  cache_paths:
-    - $HOME/.pub-cache
-    - $HOME/.gradle/caches/
-    - $HOME/Library/Caches/CocoaPods 
+          failure: true 
