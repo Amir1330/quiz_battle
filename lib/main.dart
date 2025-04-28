@@ -4,6 +4,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'providers/settings_provider.dart';
 import 'providers/quiz_provider.dart';
 import 'screens/home_screen.dart';
+import 'screens/about_screen.dart';
+import 'screens/settings_screen.dart';
+import 'screens/main_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -44,12 +47,18 @@ class MyApp extends StatelessWidget {
               GlobalCupertinoLocalizations.delegate,
             ],
             supportedLocales: const [
-              Locale('en'), // English
-              Locale('ru'), // Russian
-              Locale('kk'), // Kazakh
+              Locale('en'),
+              Locale('ru'),
+              Locale('kk'),
             ],
             locale: Locale(settings.language),
-            home: const HomeScreen(),
+            initialRoute: '/',
+            routes: {
+              '/': (context) => const MainScreen(),
+              '/home': (context) => const HomeScreen(),
+              '/about': (context) => const AboutScreen(),
+              '/settings': (context) => const SettingsScreen(),
+            },
           );
         },
       ),
