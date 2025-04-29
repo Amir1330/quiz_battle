@@ -1,45 +1,63 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'firebase_options.dart';
 import 'providers/settings_provider.dart';
 import 'providers/quiz_provider.dart';
-import 'services/firebase_service.dart';
 import 'screens/main_screen.dart';
-import 'screens/home_screen.dart';
 import 'screens/about_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/play_screen.dart';
+import 'firebase_options.dart';
+
+Future<void> initializeFirebase() async {
+  try {
+    debugPrint('Initializing Firebase...');
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    debugPrint('Firebase initialized successfully');
+  } catch (e) {
+    debugPrint('Failed to initialize Firebase: $e');
+    // You might want to show an error dialog here
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  
-  // Initialize services
-  final firebaseService = FirebaseService();
-  await firebaseService.initialize();
+  await initializeFirebase();
+  debugPrint('After Firebase init');
   
   final settingsProvider = SettingsProvider();
   await settingsProvider.loadSettings();
+  debugPrint('Settings loaded');
 
-  runApp(MyApp(settingsProvider: settingsProvider));
+  final quizProvider = QuizProvider();
+  await quizProvider.loadQuizzes();
+  debugPrint('Quizzes loaded: ${quizProvider.quizzes.length}');
+
+  runApp(MyApp(
+    settingsProvider: settingsProvider,
+    quizProvider: quizProvider,
+  ));
 }
 
 class MyApp extends StatelessWidget {
   final SettingsProvider settingsProvider;
+  final QuizProvider quizProvider;
   
-  const MyApp({super.key, required this.settingsProvider});
+  const MyApp({
+    super.key, 
+    required this.settingsProvider,
+    required this.quizProvider,
+  });
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: settingsProvider),
-        ChangeNotifierProvider(create: (_) => QuizProvider()),
+        ChangeNotifierProvider.value(value: quizProvider),
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, child) {
@@ -63,32 +81,5 @@ class MyApp extends StatelessWidget {
         },
       ),
     );
-  }
-}
-
-// В методе _saveQuiz класса _CreateQuizScreenState:
-void _saveQuiz() async {
-  if (_formKey.currentState!.validate() && _questions.isNotEmpty) {
-    final quiz = Quiz(
-      id: widget.quiz?.id,
-      title: _titleController.text,
-      description: _descriptionController.text,
-      questions: _questions,
-      language: _selectedLanguage,
-    );
-
-    final quizProvider = Provider.of<QuizProvider>(context, listen: false);
-    try {
-      if (widget.quiz == null) {
-        await quizProvider.addQuiz(quiz);
-      } else {
-        await quizProvider.updateQuiz(quiz);
-      }
-      Navigator.pop(context);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving quiz: $e')),
-      );
-    }
   }
 }

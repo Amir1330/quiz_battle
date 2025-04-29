@@ -72,16 +72,31 @@ class QuizProvider with ChangeNotifier {
 
   Future<void> loadQuizzes() async {
     try {
+      debugPrint('Loading quizzes from Firebase...');
       final DataSnapshot snapshot = await _database.child('quizzes').get();
+      debugPrint('Snapshot value: ${snapshot.value}');
+      
       if (snapshot.value != null) {
         final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
         _quizzes = data.entries.map((entry) {
-          return Quiz.fromJson(Map<String, dynamic>.from(entry.value));
-        }).toList();
+          try {
+            return Quiz.fromJson(Map<String, dynamic>.from(entry.value));
+          } catch (e) {
+            debugPrint('Error parsing quiz: $e');
+            return null;
+          }
+        }).whereType<Quiz>().toList();
+        debugPrint('Loaded ${_quizzes.length} quizzes');
+        notifyListeners();
+      } else {
+        debugPrint('No quizzes found in database');
+        _quizzes = [];
         notifyListeners();
       }
     } catch (e) {
       debugPrint('Error loading quizzes: $e');
+      _quizzes = [];
+      notifyListeners();
     }
   }
 
@@ -91,6 +106,7 @@ class QuizProvider with ChangeNotifier {
       await loadQuizzes();
     } catch (e) {
       debugPrint('Error adding quiz: $e');
+      rethrow;
     }
   }
 
@@ -100,6 +116,7 @@ class QuizProvider with ChangeNotifier {
       await loadQuizzes();
     } catch (e) {
       debugPrint('Error updating quiz: $e');
+      rethrow;
     }
   }
 
@@ -109,6 +126,7 @@ class QuizProvider with ChangeNotifier {
       await loadQuizzes();
     } catch (e) {
       debugPrint('Error deleting quiz: $e');
+      rethrow;
     }
   }
 

@@ -20,11 +20,11 @@ class FirebaseService {
 
   Future<void> importDefaultQuizzes(List<Quiz> quizzes) async {
     try {
-      final batch = _database.child('quizzes').batch();
+      final Map<String, dynamic> updates = {};
       for (var quiz in quizzes) {
-        batch.set(quiz.id, quiz.toJson());
+        updates['/quizzes/${quiz.id}'] = quiz.toJson();
       }
-      await batch.commit();
+      await _database.update(updates);
     } catch (e) {
       debugPrint('Error importing default quizzes: $e');
     }
