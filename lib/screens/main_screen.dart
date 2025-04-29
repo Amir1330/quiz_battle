@@ -2,59 +2,42 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/settings_provider.dart';
 import '../utils/translations.dart';
-import 'home_screen.dart';
-import 'about_screen.dart';
-import 'settings_screen.dart';
 
-class MainScreen extends StatefulWidget {
+class MainScreen extends StatelessWidget {
   const MainScreen({super.key});
-
-  @override
-  State<MainScreen> createState() => _MainScreenState();
-}
-
-class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0;
-  
-  static const List<Widget> _screens = [
-    HomeScreen(),
-    AboutScreen(),
-    SettingsScreen(),
-  ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
     final language = context.watch<SettingsProvider>().language;
     
     return Scaffold(
-      body: OrientationBuilder(
-        builder: (context, orientation) {
-          return _screens[_selectedIndex];
-        },
+      appBar: AppBar(
+        title: Text(Translations.get('appTitle', language)),
+        centerTitle: true,
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        items: <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.home),
-            label: Translations.get('home', language),
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.info),
-            label: Translations.get('about', language),
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.settings),
-            label: Translations.get('settings', language),
-          ),
-        ],
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
+      body: const Center(
+        child: Text('Welcome to Quiz Battle!'),
+      ),
+      drawer: Drawer(
+        child: ListView(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.play_arrow),
+              title: Text(Translations.get('play', language)),
+              onTap: () => Navigator.pushNamed(context, '/play'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: Text(Translations.get('settings', language)),
+              onTap: () => Navigator.pushNamed(context, '/settings'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.info),
+              title: Text(Translations.get('about', language)),
+              onTap: () => Navigator.pushNamed(context, '/about'),
+            ),
+          ],
+        ),
       ),
     );
   }

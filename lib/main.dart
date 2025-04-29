@@ -9,37 +9,29 @@ import 'screens/settings_screen.dart';
 import 'screens/play_screen.dart';
 import 'firebase_options.dart';
 
-Future<void> initializeFirebase() async {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
   try {
-    debugPrint('Initializing Firebase...');
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
     debugPrint('Firebase initialized successfully');
+    
+    final settingsProvider = SettingsProvider();
+    await settingsProvider.loadSettings();
+    
+    final quizProvider = QuizProvider();
+    await quizProvider.loadQuizzes();
+    
+    runApp(MyApp(
+      settingsProvider: settingsProvider,
+      quizProvider: quizProvider,
+    ));
   } catch (e) {
-    debugPrint('Failed to initialize Firebase: $e');
-    // You might want to show an error dialog here
+    debugPrint('Error during initialization: $e');
+    // Показать сообщение об ошибке пользователю
   }
-}
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  await initializeFirebase();
-  debugPrint('After Firebase init');
-  
-  final settingsProvider = SettingsProvider();
-  await settingsProvider.loadSettings();
-  debugPrint('Settings loaded');
-
-  final quizProvider = QuizProvider();
-  await quizProvider.loadQuizzes();
-  debugPrint('Quizzes loaded: ${quizProvider.quizzes.length}');
-
-  runApp(MyApp(
-    settingsProvider: settingsProvider,
-    quizProvider: quizProvider,
-  ));
 }
 
 class MyApp extends StatelessWidget {
