@@ -48,36 +48,17 @@ class QuizProvider with ChangeNotifier {
   bool get isQuizComplete => _isQuizComplete;
 
   QuizProvider() {
-    _initializeQuizzes();
+    _initializePrefs();
   }
 
-  Future<void> _initializeQuizzes() async {
+  Future<void> _initializePrefs() async {
     _prefs = await SharedPreferences.getInstance();
-    await _loadQuizzes();
-  }
-
-  Future<void> _loadQuizzes() async {
-    _prefs = await SharedPreferences.getInstance();
-    final quizzesJson = _prefs.getStringList(_quizzesKey) ?? [];
-    _quizzes =
-        quizzesJson.map((json) => Quiz.fromJson(jsonDecode(json))).toList();
-    notifyListeners();
-  }
-
-  Future<void> _saveQuizzes() async {
-    final quizzesJson =
-        _quizzes.map((quiz) => jsonEncode(quiz.toJson())).toList();
-    await _prefs.setStringList(_quizzesKey, quizzesJson);
   }
 
   Future<void> loadQuizzes() async {
     try {
       debugPrint('Loading quizzes from Firebase...');
-
-      // Проверяем подключение к Firebase
-      if (_database == null) {
-        throw Exception('Firebase database not initialized');
-      }
+      await _initializePrefs();
 
       final DataSnapshot snapshot = await _database.child('quizzes').get();
       debugPrint('Snapshot value: ${snapshot.value}');
@@ -105,17 +86,59 @@ class QuizProvider with ChangeNotifier {
           _quizzes = List.from(_defaultQuizzes);
         }
 
+        await _saveQuizzes();
+
         debugPrint('Loaded ${_quizzes.length} quizzes');
       } else {
-        debugPrint('No quizzes found in database, loading default quizzes');
+        debugPrint(
+          'No quizzes found in database, trying to load from local storage',
+        );
+        final quizzesJson = _prefs.getStringList(_quizzesKey) ?? [];
+        if (quizzesJson.isNotEmpty) {
+          _quizzes =
+              quizzesJson
+                  .map((json) => Quiz.fromJson(jsonDecode(json)))
+                  .toList();
+          debugPrint('Loaded ${_quizzes.length} quizzes from local storage');
+        } else {
+          debugPrint('No quizzes in local storage, loading default quizzes');
+          _quizzes = List.from(_defaultQuizzes);
+        }
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Error loading quizzes from Firebase: $e');
+      debugPrint('Stack trace: $stackTrace');
+      debugPrint('Trying to load from local storage...');
+
+      try {
+        final quizzesJson = _prefs.getStringList(_quizzesKey) ?? [];
+        if (quizzesJson.isNotEmpty) {
+          _quizzes =
+              quizzesJson
+                  .map((json) => Quiz.fromJson(jsonDecode(json)))
+                  .toList();
+          debugPrint('Loaded ${_quizzes.length} quizzes from local storage');
+        } else {
+          debugPrint('Loading default quizzes as fallback');
+          _quizzes = List.from(_defaultQuizzes);
+        }
+      } catch (e) {
+        debugPrint('Error loading from local storage: $e');
         _quizzes = List.from(_defaultQuizzes);
       }
-    } catch (e) {
-      debugPrint('Error loading quizzes from Firebase: $e');
-      debugPrint('Loading default quizzes as fallback');
-      _quizzes = List.from(_defaultQuizzes);
     } finally {
       notifyListeners();
+    }
+  }
+
+  Future<void> _saveQuizzes() async {
+    try {
+      final quizzesJson =
+          _quizzes.map((quiz) => jsonEncode(quiz.toJson())).toList();
+      await _prefs.setStringList(_quizzesKey, quizzesJson);
+      debugPrint('Quizzes saved to local storage');
+    } catch (e) {
+      debugPrint('Error saving quizzes to local storage: $e');
     }
   }
 

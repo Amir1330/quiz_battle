@@ -8,15 +8,23 @@ import 'screens/about_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/play_screen.dart';
 import 'firebase_options.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 Future<void> initializeFirebase() async {
   try {
+    debugPrint('Initializing Firebase...');
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
     debugPrint('Firebase initialized successfully');
-  } catch (e) {
+
+    // Проверка подключения к базе данных
+    final DatabaseReference database = FirebaseDatabase.instance.ref();
+    await database.child('.info/connected').get();
+    debugPrint('Firebase Database connection verified');
+  } catch (e, stackTrace) {
     debugPrint('Error initializing Firebase: $e');
+    debugPrint('Stack trace: $stackTrace');
     throw Exception('Failed to initialize Firebase: $e');
   }
 }
@@ -50,6 +58,7 @@ void main() async {
     debugPrint('Stack trace: $stackTrace');
     runApp(
       MaterialApp(
+        debugShowCheckedModeBanner: false,
         home: Scaffold(
           body: Center(
             child: Column(
@@ -60,12 +69,23 @@ void main() async {
                 const Text(
                   'Произошла ошибка при запуске приложения',
                   style: TextStyle(fontSize: 18),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  e.toString(),
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
-                  textAlign: TextAlign.center,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    e.toString(),
+                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    main();
+                  },
+                  child: const Text('Попробовать снова'),
                 ),
               ],
             ),
