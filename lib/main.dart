@@ -23,31 +23,52 @@ Future<void> initializeFirebase() async {
 
 void main() async {
   try {
+    debugPrint('Starting app initialization...');
     WidgetsFlutterBinding.ensureInitialized();
-    
+    debugPrint('Flutter binding initialized');
+
     await initializeFirebase();
-    debugPrint('After Firebase init');
-    
+    debugPrint('Firebase initialized successfully');
+
     final settingsProvider = SettingsProvider();
     await settingsProvider.loadSettings();
-    debugPrint('Settings loaded');
+    debugPrint('Settings loaded successfully');
 
     final quizProvider = QuizProvider();
+    debugPrint('QuizProvider created');
     await quizProvider.loadQuizzes();
-    debugPrint('Quizzes loaded: ${quizProvider.quizzes.length}');
+    debugPrint(
+      'Quizzes loaded successfully. Count: ${quizProvider.quizzes.length}',
+    );
 
-    runApp(MyApp(
-      settingsProvider: settingsProvider,
-      quizProvider: quizProvider,
-    ));
-  } catch (e) {
-    debugPrint('Error during initialization: $e');
-    // Здесь можно добавить отображение ошибки пользователю
+    runApp(
+      MyApp(settingsProvider: settingsProvider, quizProvider: quizProvider),
+    );
+    debugPrint('App started successfully');
+  } catch (e, stackTrace) {
+    debugPrint('Critical error during initialization: $e');
+    debugPrint('Stack trace: $stackTrace');
     runApp(
       MaterialApp(
         home: Scaffold(
           body: Center(
-            child: Text('Error initializing app: $e'),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                const Text(
+                  'Произошла ошибка при запуске приложения',
+                  style: TextStyle(fontSize: 18),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  e.toString(),
+                  style: const TextStyle(fontSize: 14, color: Colors.grey),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -58,9 +79,9 @@ void main() async {
 class MyApp extends StatelessWidget {
   final SettingsProvider settingsProvider;
   final QuizProvider quizProvider;
-  
+
   const MyApp({
-    super.key, 
+    super.key,
     required this.settingsProvider,
     required this.quizProvider,
   });

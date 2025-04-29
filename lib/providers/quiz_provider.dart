@@ -73,29 +73,48 @@ class QuizProvider with ChangeNotifier {
   Future<void> loadQuizzes() async {
     try {
       debugPrint('Loading quizzes from Firebase...');
+
+      // Проверяем подключение к Firebase
+      if (_database == null) {
+        throw Exception('Firebase database not initialized');
+      }
+
       final DataSnapshot snapshot = await _database.child('quizzes').get();
       debugPrint('Snapshot value: ${snapshot.value}');
-      
+
       if (snapshot.value != null) {
-        final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
-        _quizzes = data.entries.map((entry) {
-          try {
-            return Quiz.fromJson(Map<String, dynamic>.from(entry.value));
-          } catch (e) {
-            debugPrint('Error parsing quiz: $e');
-            return null;
-          }
-        }).whereType<Quiz>().toList();
+        final Map<dynamic, dynamic> data =
+            snapshot.value as Map<dynamic, dynamic>;
+        _quizzes =
+            data.entries
+                .map((entry) {
+                  try {
+                    return Quiz.fromJson(
+                      Map<String, dynamic>.from(entry.value),
+                    );
+                  } catch (e) {
+                    debugPrint('Error parsing quiz: $e');
+                    return null;
+                  }
+                })
+                .whereType<Quiz>()
+                .toList();
+
+        if (_quizzes.isEmpty) {
+          debugPrint('No valid quizzes found, loading default quizzes');
+          _quizzes = List.from(_defaultQuizzes);
+        }
+
         debugPrint('Loaded ${_quizzes.length} quizzes');
-        notifyListeners();
       } else {
-        debugPrint('No quizzes found in database');
-        _quizzes = [];
-        notifyListeners();
+        debugPrint('No quizzes found in database, loading default quizzes');
+        _quizzes = List.from(_defaultQuizzes);
       }
     } catch (e) {
-      debugPrint('Error loading quizzes: $e');
-      _quizzes = [];
+      debugPrint('Error loading quizzes from Firebase: $e');
+      debugPrint('Loading default quizzes as fallback');
+      _quizzes = List.from(_defaultQuizzes);
+    } finally {
       notifyListeners();
     }
   }

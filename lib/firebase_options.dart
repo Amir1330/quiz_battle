@@ -10,6 +10,8 @@ class DefaultFirebaseOptions {
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
+      case TargetPlatform.windows:
+        return android;
       case TargetPlatform.iOS:
         throw UnsupportedError('iOS platform is not configured');
       default:
@@ -23,5 +25,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: '107586422279',
     projectId: 'quizbattle-578b8',
     storageBucket: 'quizbattle-578b8.firebasestorage.app',
+    databaseURL: 'https://quizbattle-578b8-default-rtdb.firebaseio.com',
   );
 }
