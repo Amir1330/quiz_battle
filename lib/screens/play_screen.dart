@@ -7,8 +7,23 @@ import '../utils/translations.dart';
 import 'create_quiz_screen.dart';
 import 'quiz_game_screen.dart';
 
-class PlayScreen extends StatelessWidget {
+class PlayScreen extends StatefulWidget {
   const PlayScreen({super.key});
+
+  @override
+  _PlayScreenState createState() => _PlayScreenState();
+}
+
+class _PlayScreenState extends State<PlayScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _loadQuizzes();
+  }
+
+  Future<void> _loadQuizzes() async {
+    await context.read<QuizProvider>().loadQuizzes();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -118,4 +133,4 @@ class PlayScreen extends StatelessWidget {
       ),
     );
   }
-} 
+}

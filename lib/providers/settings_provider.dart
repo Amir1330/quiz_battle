@@ -8,6 +8,13 @@ class SettingsProvider with ChangeNotifier {
   String get language => _language;
   ThemeMode get themeMode => _themeMode;
 
+  Future<void> loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    _language = prefs.getString('language') ?? 'en';
+    _themeMode = ThemeMode.values[prefs.getInt('themeMode') ?? ThemeMode.system.index];
+    notifyListeners();
+  }
+
   Future<void> setLanguage(String lang) async {
     _language = lang;
     final prefs = await SharedPreferences.getInstance();
@@ -19,13 +26,6 @@ class SettingsProvider with ChangeNotifier {
     _themeMode = mode;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('themeMode', mode.index);
-    notifyListeners();
-  }
-
-  Future<void> loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    _language = prefs.getString('language') ?? 'en';
-    _themeMode = ThemeMode.values[prefs.getInt('themeMode') ?? ThemeMode.system.index];
     notifyListeners();
   }
 }

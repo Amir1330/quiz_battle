@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/quiz.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class QuizProvider with ChangeNotifier {
   static const String _quizzesKey = 'quizzes';
   late SharedPreferences _prefs;
+  final DatabaseReference _database = FirebaseDatabase.instance.ref();
   List<Quiz> _quizzes = [];
   final List<Quiz> _defaultQuizzes = [
     Quiz(
@@ -68,25 +70,46 @@ class QuizProvider with ChangeNotifier {
     await _prefs.setStringList(_quizzesKey, quizzesJson);
   }
 
+  Future<void> loadQuizzes() async {
+    try {
+      final DataSnapshot snapshot = await _database.child('quizzes').get();
+      if (snapshot.value != null) {
+        final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+        _quizzes = data.entries.map((entry) {
+          return Quiz.fromJson(Map<String, dynamic>.from(entry.value));
+        }).toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error loading quizzes: $e');
+    }
+  }
+
   Future<void> addQuiz(Quiz quiz) async {
-    _quizzes.add(quiz);
-    await _saveQuizzes();
-    notifyListeners();
+    try {
+      await _database.child('quizzes').child(quiz.id).set(quiz.toJson());
+      await loadQuizzes();
+    } catch (e) {
+      debugPrint('Error adding quiz: $e');
+    }
   }
 
   Future<void> updateQuiz(Quiz quiz) async {
-    final index = _quizzes.indexWhere((q) => q.id == quiz.id);
-    if (index != -1) {
-      _quizzes[index] = quiz;
-      await _saveQuizzes();
-      notifyListeners();
+    try {
+      await _database.child('quizzes').child(quiz.id).update(quiz.toJson());
+      await loadQuizzes();
+    } catch (e) {
+      debugPrint('Error updating quiz: $e');
     }
   }
 
   Future<void> deleteQuiz(String quizId) async {
-    _quizzes.removeWhere((quiz) => quiz.id == quizId);
-    await _saveQuizzes();
-    notifyListeners();
+    try {
+      await _database.child('quizzes').child(quizId).remove();
+      await loadQuizzes();
+    } catch (e) {
+      debugPrint('Error deleting quiz: $e');
+    }
   }
 
   List<Quiz> getQuizzesByLanguage(String language) {

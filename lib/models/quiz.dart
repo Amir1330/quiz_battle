@@ -43,7 +43,7 @@ class Quiz {
     required this.language,
     required this.questions,
     this.isDefault = false,
-  }) : id = id ?? DateTime.now().toString();
+  }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString();
 
   factory Quiz.fromJson(Map<String, dynamic> json) {
     return Quiz(
@@ -53,7 +53,7 @@ class Quiz {
       language: json['language'] as String,
       isDefault: json['isDefault'] as bool? ?? false,
       questions: (json['questions'] as List)
-          .map((q) => Question.fromJson(q as Map<String, dynamic>))
+          .map((q) => Question.fromJson(Map<String, dynamic>.from(q)))
           .toList(),
     );
   }
