@@ -40,6 +40,9 @@ dependencies:
     sdk: flutter
   intl: ^0.19.0
   uuid: ^4.3.3
+  flutter_native_splash: ^2.3.13
+  device_info_plus: ^9.1.2
+  package_info_plus: ^5.0.1
 
 dev_dependencies:
   flutter_test:
@@ -93,3 +96,16 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+  assets:
+    - assets/images/
+    - assets/icons/
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  color_dark: "#121212"
+  image: assets/icons/splash_icon.png
+  android_12:
+    image: assets/icons/splash_icon.png
+    icon_background_color: "#FFFFFF"
+    icon_background_color_dark: "#121212"

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io' show Platform;
 
 class SettingsProvider with ChangeNotifier {
   final String _languageKey = 'language';
@@ -16,27 +17,54 @@ class SettingsProvider with ChangeNotifier {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    _language = prefs.getString(_languageKey) ?? 'en';
-    _themeMode = ThemeMode.values[prefs.getInt(_themeModeKey) ?? 0];
-    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Определяем язык системы
+      String defaultLanguage = 'en';
+      if (Platform.localeName.startsWith('ru')) {
+        defaultLanguage = 'ru';
+      } else if (Platform.localeName.startsWith('kk')) {
+        defaultLanguage = 'kk';
+      }
+
+      _language = prefs.getString(_languageKey) ?? defaultLanguage;
+      _themeMode =
+          ThemeMode.values[prefs.getInt(_themeModeKey) ??
+              ThemeMode.system.index];
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Ошибка загрузки настроек: $e');
+      // Используем значения по умолчанию в случае ошибки
+      _language = 'en';
+      _themeMode = ThemeMode.system;
+    }
   }
 
   Future<void> setLanguage(String lang) async {
     if (_language != lang) {
-      _language = lang;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_languageKey, lang);
-      notifyListeners();
+      try {
+        _language = lang;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_languageKey, lang);
+        notifyListeners();
+      } catch (e) {
+        debugPrint('Ошибка сохранения языка: $e');
+      }
     }
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
     if (_themeMode != mode) {
-      _themeMode = mode;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_themeModeKey, mode.index);
-      notifyListeners();
+      try {
+        _themeMode = mode;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(_themeModeKey, mode.index);
+        notifyListeners();
+      } catch (e) {
+        debugPrint('Ошибка сохранения темы: $e');
+      }
     }
   }
 }
