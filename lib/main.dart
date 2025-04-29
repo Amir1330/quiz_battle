@@ -9,28 +9,49 @@ import 'screens/settings_screen.dart';
 import 'screens/play_screen.dart';
 import 'firebase_options.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
+Future<void> initializeFirebase() async {
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
     debugPrint('Firebase initialized successfully');
+  } catch (e) {
+    debugPrint('Error initializing Firebase: $e');
+    throw Exception('Failed to initialize Firebase: $e');
+  }
+}
+
+void main() async {
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    
+    await initializeFirebase();
+    debugPrint('After Firebase init');
     
     final settingsProvider = SettingsProvider();
     await settingsProvider.loadSettings();
-    
+    debugPrint('Settings loaded');
+
     final quizProvider = QuizProvider();
     await quizProvider.loadQuizzes();
-    
+    debugPrint('Quizzes loaded: ${quizProvider.quizzes.length}');
+
     runApp(MyApp(
       settingsProvider: settingsProvider,
       quizProvider: quizProvider,
     ));
   } catch (e) {
     debugPrint('Error during initialization: $e');
-    // Показать сообщение об ошибке пользователю
+    // Здесь можно добавить отображение ошибки пользователю
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Text('Error initializing app: $e'),
+          ),
+        ),
+      ),
+    );
   }
 }
 
