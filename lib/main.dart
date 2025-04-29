@@ -1,32 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter/services.dart';
 import 'providers/settings_provider.dart';
 import 'providers/quiz_provider.dart';
+import 'screens/main_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/about_screen.dart';
 import 'screens/settings_screen.dart';
-import 'screens/main_screen.dart';
+import 'screens/play_screen.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Устанавливаем предпочтительные ориентации
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
-
-  // Настраиваем системные UI оверлеи
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      statusBarBrightness: Brightness.light,
-    ),
-  );
-
+void main() {
   runApp(const MyApp());
 }
 
@@ -44,35 +26,17 @@ class MyApp extends StatelessWidget {
         builder: (context, settings, child) {
           return MaterialApp(
             title: 'Quiz Battle',
-            debugShowCheckedModeBanner: false,
             theme: ThemeData(
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: Colors.deepPurple,
-                brightness: Brightness.light,
-              ),
+              colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
               useMaterial3: true,
-              appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
             ),
-            darkTheme: ThemeData(
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: Colors.deepPurple,
-                brightness: Brightness.dark,
-              ),
-              useMaterial3: true,
-              appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
-            ),
+            darkTheme: ThemeData.dark(useMaterial3: true),
             themeMode: settings.themeMode,
-            localizationsDelegates: const [
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            supportedLocales: const [Locale('en'), Locale('ru'), Locale('kk')],
             locale: Locale(settings.language),
             initialRoute: '/',
             routes: {
               '/': (context) => const MainScreen(),
-              '/home': (context) => const HomeScreen(),
+              '/play': (context) => const PlayScreen(),
               '/about': (context) => const AboutScreen(),
               '/settings': (context) => const SettingsScreen(),
             },

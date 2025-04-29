@@ -1,34 +1,30 @@
 import 'package:uuid/uuid.dart';
 
 class Question {
-  final String id;
   final String question;
   final List<String> options;
   final int correctOptionIndex;
 
   Question({
-    String? id,
     required this.question,
     required this.options,
     required this.correctOptionIndex,
-  }) : id = id ?? const Uuid().v4();
+  });
+
+  factory Question.fromJson(Map<String, dynamic> json) {
+    return Question(
+      question: json['question'] as String,
+      options: List<String>.from(json['options']),
+      correctOptionIndex: json['correctOptionIndex'] as int,
+    );
+  }
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
       'question': question,
       'options': options,
       'correctOptionIndex': correctOptionIndex,
     };
-  }
-
-  factory Question.fromJson(Map<String, dynamic> json) {
-    return Question(
-      id: json['id'],
-      question: json['question'],
-      options: List<String>.from(json['options']),
-      correctOptionIndex: json['correctOptionIndex'],
-    );
   }
 }
 
@@ -36,57 +32,40 @@ class Quiz {
   final String id;
   final String title;
   final String description;
-  final List<Question> questions;
   final String language;
+  final List<Question> questions;
   final bool isDefault;
 
   Quiz({
     String? id,
     required this.title,
     required this.description,
-    required this.questions,
     required this.language,
+    required this.questions,
     this.isDefault = false,
-  }) : id = id ?? const Uuid().v4();
+  }) : id = id ?? DateTime.now().toString();
+
+  factory Quiz.fromJson(Map<String, dynamic> json) {
+    return Quiz(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      description: json['description'] as String,
+      language: json['language'] as String,
+      isDefault: json['isDefault'] as bool? ?? false,
+      questions: (json['questions'] as List)
+          .map((q) => Question.fromJson(q as Map<String, dynamic>))
+          .toList(),
+    );
+  }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'title': title,
       'description': description,
-      'questions': questions.map((q) => q.toJson()).toList(),
       'language': language,
       'isDefault': isDefault,
+      'questions': questions.map((q) => q.toJson()).toList(),
     };
   }
-
-  factory Quiz.fromJson(Map<String, dynamic> json) {
-    return Quiz(
-      id: json['id'],
-      title: json['title'],
-      description: json['description'],
-      questions: (json['questions'] as List)
-          .map((q) => Question.fromJson(q))
-          .toList(),
-      language: json['language'],
-      isDefault: json['isDefault'] ?? false,
-    );
-  }
-
-  Quiz copyWith({
-    String? title,
-    String? description,
-    List<Question>? questions,
-    String? language,
-    bool? isDefault,
-  }) {
-    return Quiz(
-      id: id,
-      title: title ?? this.title,
-      description: description ?? this.description,
-      questions: questions ?? this.questions,
-      language: language ?? this.language,
-      isDefault: isDefault ?? this.isDefault,
-    );
-  }
-} 
+}

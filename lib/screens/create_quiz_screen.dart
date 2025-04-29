@@ -265,7 +265,6 @@ class _QuestionDialogState extends State<_QuestionDialog> {
   void _saveQuestion() {
     if (_formKey.currentState!.validate()) {
       final question = Question(
-        id: widget.question?.id,
         question: _questionController.text,
         options: _optionControllers.map((c) => c.text).toList(),
         correctOptionIndex: _correctOptionIndex,
@@ -351,4 +350,4 @@ class _QuestionDialogState extends State<_QuestionDialog> {
       ],
     );
   }
-} 
+}

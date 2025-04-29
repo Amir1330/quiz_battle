@@ -20,27 +20,9 @@ class QuizProvider with ChangeNotifier {
           correctOptionIndex: 1,
         ),
         Question(
-          question: 'What is 5 x 5?',
-          options: ['20', '25', '30', '35'],
-          correctOptionIndex: 1,
-        ),
-      ],
-    ),
-    Quiz(
-      title: 'Basic Science',
-      description: 'Test your basic science knowledge',
-      language: 'en',
-      isDefault: true,
-      questions: [
-        Question(
-          question: 'What is the capital of France?',
-          options: ['London', 'Berlin', 'Paris', 'Madrid'],
+          question: 'What is 10 - 5?',
+          options: ['3', '4', '5', '6'],
           correctOptionIndex: 2,
-        ),
-        Question(
-          question: 'Which planet is known as the Red Planet?',
-          options: ['Venus', 'Mars', 'Jupiter', 'Saturn'],
-          correctOptionIndex: 1,
         ),
       ],
     ),
@@ -64,7 +46,12 @@ class QuizProvider with ChangeNotifier {
   bool get isQuizComplete => _isQuizComplete;
 
   QuizProvider() {
-    _loadQuizzes();
+    _initializeQuizzes();
+  }
+
+  Future<void> _initializeQuizzes() async {
+    _prefs = await SharedPreferences.getInstance();
+    await _loadQuizzes();
   }
 
   Future<void> _loadQuizzes() async {
