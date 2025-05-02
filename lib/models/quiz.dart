@@ -35,6 +35,7 @@ class Quiz {
   final String language;
   final List<Question> questions;
   final bool isDefault;
+  static final Uuid _uuid = Uuid();
 
   Quiz({
     String? id,
@@ -43,7 +44,7 @@ class Quiz {
     required this.language,
     required this.questions,
     this.isDefault = false,
-  }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString();
+  }) : id = id ?? _uuid.v4();
 
   factory Quiz.fromJson(Map<String, dynamic> json) {
     return Quiz(
