@@ -4,11 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/quiz.dart';
 import 'package:firebase_database/firebase_database.dart';
+import '../services/firebase_service.dart';
 
 class QuizProvider with ChangeNotifier {
   static const String _quizzesKey = 'quizzes';
   late SharedPreferences _prefs;
-  DatabaseReference? _database;
+  final FirebaseService _firebaseService = FirebaseService.instance;
   List<Quiz> _quizzes = [];
   final List<Quiz> _defaultQuizzes = [
     Quiz(
@@ -50,87 +51,63 @@ class QuizProvider with ChangeNotifier {
 
   QuizProvider() {
     _initializePrefs();
-    // Initialize Firebase only if not on Linux
-    if (!Platform.isLinux) {
-      try {
-        _database = FirebaseDatabase.instance.ref();
-        debugPrint('Firebase database reference initialized');
-      } catch (e) {
-        debugPrint('Failed to initialize Firebase database: $e');
-      }
-    }
+    _initializeFirebase();
   }
 
   Future<void> _initializePrefs() async {
     _prefs = await SharedPreferences.getInstance();
+  }
+  
+  Future<void> _initializeFirebase() async {
+    await _firebaseService.initialize();
   }
 
   Future<void> loadQuizzes() async {
     try {
       await _initializePrefs();
       
-      // Skip Firebase if on Linux or if _database is null
-      if (Platform.isLinux || _database == null) {
+      // Skip Firebase if not supported or not initialized
+      if (!FirebaseService.isSupported) {
         debugPrint('Firebase not available, loading from local storage only');
         await _loadFromLocalStorage();
         return;
       }
 
       debugPrint('Loading quizzes from Firebase...');
-      try {
-        final DataSnapshot snapshot = await _database!.child('quizzes').get();
-        debugPrint('Snapshot value: ${snapshot.value}');
+      final snapshot = await _firebaseService.getData('quizzes');
 
-        if (snapshot.exists && snapshot.value != null) {
-          final Map<dynamic, dynamic> data =
-              snapshot.value as Map<dynamic, dynamic>;
-          _quizzes =
-              data.entries
-                  .map((entry) {
-                    try {
-                      return Quiz.fromJson(
-                        Map<String, dynamic>.from(entry.value),
-                      );
-                    } catch (e) {
-                      debugPrint('Error parsing quiz: $e');
-                      return null;
-                    }
-                  })
-                  .whereType<Quiz>()
-                  .toList();
-
-          if (_quizzes.isEmpty) {
-            debugPrint('No valid quizzes found, loading default quizzes');
-            _quizzes = List.from(_defaultQuizzes);
-            
-            // Save default quizzes to Firebase
-            for (final quiz in _defaultQuizzes) {
-              if (!Platform.isLinux && _database != null) {
-                await _database!.child('quizzes').child(quiz.id).set(quiz.toJson());
-                debugPrint('Saved default quiz to Firebase: ${quiz.title}');
+      if (snapshot != null && snapshot.exists && snapshot.value != null) {
+        final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+        _quizzes = data.entries
+            .map((entry) {
+              try {
+                return Quiz.fromJson(Map<String, dynamic>.from(entry.value));
+              } catch (e) {
+                debugPrint('Error parsing quiz: $e');
+                return null;
               }
-            }
-          }
+            })
+            .whereType<Quiz>()
+            .toList();
 
-          await _saveQuizzes();
-          debugPrint('Loaded ${_quizzes.length} quizzes');
-        } else {
-          debugPrint('No quizzes found in database, loading default quizzes');
+        if (_quizzes.isEmpty) {
+          debugPrint('No valid quizzes found, loading default quizzes');
           _quizzes = List.from(_defaultQuizzes);
           
           // Save default quizzes to Firebase
-          for (final quiz in _defaultQuizzes) {
-            if (!Platform.isLinux && _database != null) {
-              await _database!.child('quizzes').child(quiz.id).set(quiz.toJson());
-              debugPrint('Saved default quiz to Firebase: ${quiz.title}');
-            }
-          }
-          
-          await _saveQuizzes();
+          await _saveDefaultQuizzesToFirebase();
         }
-      } catch (e) {
-        debugPrint('Error accessing Firebase snapshot: $e');
-        await _loadFromLocalStorage();
+
+        await _saveQuizzes();
+        debugPrint('Loaded ${_quizzes.length} quizzes');
+      } else {
+        debugPrint('No quizzes found in database, loading default quizzes');
+        _quizzes = List.from(_defaultQuizzes);
+        
+        // Save default quizzes to Firebase
+        await _saveDefaultQuizzesToFirebase();
+        
+        await _saveQuizzes();
       }
     } catch (e, stackTrace) {
       debugPrint('Error loading quizzes from Firebase: $e');
@@ -139,6 +116,15 @@ class QuizProvider with ChangeNotifier {
       await _loadFromLocalStorage();
     } finally {
       notifyListeners();
+    }
+  }
+  
+  Future<void> _saveDefaultQuizzesToFirebase() async {
+    if (!FirebaseService.isSupported) return;
+    
+    for (final quiz in _defaultQuizzes) {
+      await _firebaseService.saveData('quizzes/${quiz.id}', quiz.toJson());
+      debugPrint('Saved default quiz to Firebase: ${quiz.title}');
     }
   }
 
@@ -180,9 +166,9 @@ class QuizProvider with ChangeNotifier {
       _quizzes.add(quiz);
       
       // Save to Firebase if available
-      if (_database != null && !Platform.isLinux) {
+      if (FirebaseService.isSupported) {
         debugPrint('Saving quiz to Firebase...');
-        await _database!.child('quizzes').child(quiz.id).set(quiz.toJson());
+        await _firebaseService.saveData('quizzes/${quiz.id}', quiz.toJson());
         debugPrint('Quiz saved to Firebase successfully');
       } else {
         debugPrint('Firebase not available, saving only to local storage');
@@ -210,9 +196,9 @@ class QuizProvider with ChangeNotifier {
         _quizzes[index] = quiz;
         
         // Update in Firebase if available
-        if (_database != null && !Platform.isLinux) {
+        if (FirebaseService.isSupported) {
           debugPrint('Updating quiz in Firebase...');
-          await _database!.child('quizzes').child(quiz.id).update(quiz.toJson());
+          await _firebaseService.updateData('quizzes/${quiz.id}', quiz.toJson());
           debugPrint('Quiz updated in Firebase successfully');
         } else {
           debugPrint('Firebase not available, updating only in local storage');
@@ -239,9 +225,9 @@ class QuizProvider with ChangeNotifier {
       _quizzes.removeWhere((quiz) => quiz.id == quizId);
       
       // Remove from Firebase if available
-      if (_database != null && !Platform.isLinux) {
+      if (FirebaseService.isSupported) {
         debugPrint('Deleting quiz from Firebase...');
-        await _database!.child('quizzes').child(quizId).remove();
+        await _firebaseService.deleteData('quizzes/$quizId');
         debugPrint('Quiz deleted from Firebase successfully');
       } else {
         debugPrint('Firebase not available, deleting only from local storage');

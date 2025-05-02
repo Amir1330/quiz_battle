@@ -9,24 +9,17 @@ import 'screens/settings_screen.dart';
 import 'screens/play_screen.dart';
 import 'firebase_options.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'dart:io' show Platform;
+import 'services/firebase_service.dart';
 
-Future<void> initializeFirebase() async {
-  try {
-    debugPrint('Initializing Firebase...');
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    debugPrint('Firebase initialized successfully');
-
-    // Проверка подключения к базе данных
-    final DatabaseReference database = FirebaseDatabase.instance.ref();
-    await database.child('.info/connected').get();
-    debugPrint('Firebase Database connection verified');
-  } catch (e, stackTrace) {
-    debugPrint('Error initializing Firebase: $e');
-    debugPrint('Stack trace: $stackTrace');
-    throw Exception('Failed to initialize Firebase: $e');
-  }
+Future<void> initializeApp() async {
+  debugPrint('Starting app initialization...');
+  
+  // Initialize Firebase
+  final firebaseService = FirebaseService.instance;
+  await firebaseService.initialize();
+  
+  debugPrint('Firebase initialization complete. Supported: ${FirebaseService.isSupported}');
 }
 
 void main() async {
@@ -35,9 +28,8 @@ void main() async {
     WidgetsFlutterBinding.ensureInitialized();
     debugPrint('Flutter binding initialized');
 
-    await initializeFirebase();
-    debugPrint('Firebase initialized successfully');
-
+    await initializeApp();
+    
     final settingsProvider = SettingsProvider();
     await settingsProvider.loadSettings();
     debugPrint('Settings loaded successfully');
