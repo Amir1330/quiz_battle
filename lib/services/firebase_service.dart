@@ -19,7 +19,7 @@ class FirebaseService {
   }
 
   static bool get isInitialized => _initialized;
-  static bool get isSupported => _isSupported && !Platform.isLinux;
+  static bool get isSupported => _isSupported;
   static DatabaseReference? get database => _databaseRef;
 
   Future<bool> initialize() async {
@@ -32,6 +32,7 @@ class FirebaseService {
       if (Platform.isLinux) {
         debugPrint('⚠️ Firebase not supported on Linux platform');
         _isSupported = false;
+        _initialized = true; // Mark as initialized so we don't try again
         return false;
       }
 
@@ -41,20 +42,31 @@ class FirebaseService {
       );
       
       // Enable persistence
-      FirebaseDatabase.instance.setPersistenceEnabled(true);
+      try {
+        FirebaseDatabase.instance.setPersistenceEnabled(true);
+        debugPrint('Firebase persistence enabled');
+      } catch (e) {
+        debugPrint('Could not enable Firebase persistence: $e');
+        // Continue anyway
+      }
       
       // Get database reference
       _databaseRef = FirebaseDatabase.instance.ref();
       
       // Test connection
-      final connectionRef = FirebaseDatabase.instance.ref('.info/connected');
-      final snapshot = await connectionRef.get();
-      final isConnected = snapshot.value == true;
-      
-      if (isConnected) {
-        debugPrint('✅ Firebase connected successfully');
-      } else {
-        debugPrint('⚠️ Firebase connection test failed, but initialization completed');
+      try {
+        final connectionRef = FirebaseDatabase.instance.ref('.info/connected');
+        final snapshot = await connectionRef.get();
+        final isConnected = snapshot.value == true;
+        
+        if (isConnected) {
+          debugPrint('✅ Firebase connected successfully');
+        } else {
+          debugPrint('⚠️ Firebase connection test failed, but initialization completed');
+        }
+      } catch (e) {
+        debugPrint('⚠️ Could not test Firebase connection: $e');
+        // Continue anyway
       }
       
       _initialized = true;
@@ -63,6 +75,7 @@ class FirebaseService {
       debugPrint('❌ Error initializing Firebase: $e');
       debugPrint('Stack trace: $stackTrace');
       _isSupported = false;
+      _initialized = true; // Mark as initialized to prevent retries
       return false;
     }
   }
@@ -122,6 +135,8 @@ class FirebaseService {
   }
 
   Future<void> importDefaultQuizzes(List<Quiz> quizzes) async {
+    if (!isSupported || !_initialized || _databaseRef == null) return;
+    
     try {
       final Map<String, dynamic> updates = {};
       for (var quiz in quizzes) {
@@ -134,13 +149,22 @@ class FirebaseService {
   }
 
   Stream<List<Quiz>> quizzesStream() {
+    if (!isSupported || !_initialized || _databaseRef == null) {
+      return Stream.value([]);
+    }
+    
     return _databaseRef!.child('quizzes').onValue.map((event) {
       final data = event.snapshot.value as Map<dynamic, dynamic>?;
       if (data == null) return [];
       
-      return data.entries.map((entry) {
-        return Quiz.fromJson(Map<String, dynamic>.from(entry.value));
-      }).toList();
+      try {
+        return data.entries.map((entry) {
+          return Quiz.fromJson(Map<String, dynamic>.from(entry.value));
+        }).toList();
+      } catch (e) {
+        debugPrint('Error parsing quizzes from stream: $e');
+        return <Quiz>[];
+      }
     });
   }
 }

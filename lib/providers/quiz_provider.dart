@@ -50,24 +50,36 @@ class QuizProvider with ChangeNotifier {
   bool get isQuizComplete => _isQuizComplete;
 
   QuizProvider() {
-    _initializePrefs();
-    _initializeFirebase();
+    _initializeAsync();
+  }
+
+  Future<void> _initializeAsync() async {
+    await _initializePrefs();
+    await _initializeFirebase();
   }
 
   Future<void> _initializePrefs() async {
-    _prefs = await SharedPreferences.getInstance();
+    try {
+      _prefs = await SharedPreferences.getInstance();
+      debugPrint('SharedPreferences initialized successfully');
+    } catch (e) {
+      debugPrint('Error initializing SharedPreferences: $e');
+    }
   }
   
   Future<void> _initializeFirebase() async {
-    await _firebaseService.initialize();
+    final result = await _firebaseService.initialize();
+    debugPrint('Firebase initialization result: $result (supported: ${FirebaseService.isSupported})');
   }
+  
+  bool get _isFirebaseAvailable => FirebaseService.isInitialized && FirebaseService.isSupported;
 
   Future<void> loadQuizzes() async {
     try {
       await _initializePrefs();
       
       // Skip Firebase if not supported or not initialized
-      if (!FirebaseService.isSupported) {
+      if (!_isFirebaseAvailable) {
         debugPrint('Firebase not available, loading from local storage only');
         await _loadFromLocalStorage();
         return;
@@ -77,38 +89,43 @@ class QuizProvider with ChangeNotifier {
       final snapshot = await _firebaseService.getData('quizzes');
 
       if (snapshot != null && snapshot.exists && snapshot.value != null) {
-        final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
-        _quizzes = data.entries
-            .map((entry) {
-              try {
-                return Quiz.fromJson(Map<String, dynamic>.from(entry.value));
-              } catch (e) {
-                debugPrint('Error parsing quiz: $e');
-                return null;
-              }
-            })
-            .whereType<Quiz>()
-            .toList();
+        try {
+          final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+          _quizzes = data.entries
+              .map((entry) {
+                try {
+                  return Quiz.fromJson(Map<String, dynamic>.from(entry.value));
+                } catch (e) {
+                  debugPrint('Error parsing quiz: $e');
+                  return null;
+                }
+              })
+              .whereType<Quiz>()
+              .toList();
 
-        if (_quizzes.isEmpty) {
-          debugPrint('No valid quizzes found, loading default quizzes');
+          if (_quizzes.isEmpty) {
+            debugPrint('No valid quizzes found in Firebase, loading default quizzes');
+            _quizzes = List.from(_defaultQuizzes);
+            
+            // Save default quizzes to Firebase
+            await _saveDefaultQuizzesToFirebase();
+          } else {
+            debugPrint('Loaded ${_quizzes.length} quizzes from Firebase');
+          }
+        } catch (e) {
+          debugPrint('Error parsing Firebase data: $e');
           _quizzes = List.from(_defaultQuizzes);
-          
-          // Save default quizzes to Firebase
-          await _saveDefaultQuizzesToFirebase();
         }
-
-        await _saveQuizzes();
-        debugPrint('Loaded ${_quizzes.length} quizzes');
       } else {
-        debugPrint('No quizzes found in database, loading default quizzes');
+        debugPrint('No quizzes found in Firebase database, loading default quizzes');
         _quizzes = List.from(_defaultQuizzes);
         
         // Save default quizzes to Firebase
         await _saveDefaultQuizzesToFirebase();
-        
-        await _saveQuizzes();
       }
+      
+      // Always save to local storage as backup
+      await _saveQuizzes();
     } catch (e, stackTrace) {
       debugPrint('Error loading quizzes from Firebase: $e');
       debugPrint('Stack trace: $stackTrace');
@@ -120,23 +137,32 @@ class QuizProvider with ChangeNotifier {
   }
   
   Future<void> _saveDefaultQuizzesToFirebase() async {
-    if (!FirebaseService.isSupported) return;
+    if (!_isFirebaseAvailable) return;
     
-    for (final quiz in _defaultQuizzes) {
-      await _firebaseService.saveData('quizzes/${quiz.id}', quiz.toJson());
-      debugPrint('Saved default quiz to Firebase: ${quiz.title}');
+    try {
+      for (final quiz in _defaultQuizzes) {
+        final result = await _firebaseService.saveData('quizzes/${quiz.id}', quiz.toJson());
+        debugPrint('Saved default quiz to Firebase (${quiz.title}): $result');
+      }
+    } catch (e) {
+      debugPrint('Error saving default quizzes to Firebase: $e');
     }
   }
 
   Future<void> _loadFromLocalStorage() async {
     try {
+      await _initializePrefs();
       final quizzesJson = _prefs.getStringList(_quizzesKey) ?? [];
       if (quizzesJson.isNotEmpty) {
-        _quizzes =
-            quizzesJson
-                .map((json) => Quiz.fromJson(jsonDecode(json)))
-                .toList();
-        debugPrint('Loaded ${_quizzes.length} quizzes from local storage');
+        try {
+          _quizzes = quizzesJson
+              .map((json) => Quiz.fromJson(jsonDecode(json)))
+              .toList();
+          debugPrint('Loaded ${_quizzes.length} quizzes from local storage');
+        } catch (e) {
+          debugPrint('Error parsing quizzes from local storage: $e');
+          _quizzes = List.from(_defaultQuizzes);
+        }
       } else {
         debugPrint('No quizzes in local storage, loading default quizzes');
         _quizzes = List.from(_defaultQuizzes);
@@ -149,6 +175,7 @@ class QuizProvider with ChangeNotifier {
 
   Future<void> _saveQuizzes() async {
     try {
+      await _initializePrefs();
       final quizzesJson =
           _quizzes.map((quiz) => jsonEncode(quiz.toJson())).toList();
       await _prefs.setStringList(_quizzesKey, quizzesJson);
@@ -166,10 +193,10 @@ class QuizProvider with ChangeNotifier {
       _quizzes.add(quiz);
       
       // Save to Firebase if available
-      if (FirebaseService.isSupported) {
+      if (_isFirebaseAvailable) {
         debugPrint('Saving quiz to Firebase...');
-        await _firebaseService.saveData('quizzes/${quiz.id}', quiz.toJson());
-        debugPrint('Quiz saved to Firebase successfully');
+        final result = await _firebaseService.saveData('quizzes/${quiz.id}', quiz.toJson());
+        debugPrint('Quiz saved to Firebase: $result');
       } else {
         debugPrint('Firebase not available, saving only to local storage');
       }
@@ -196,10 +223,10 @@ class QuizProvider with ChangeNotifier {
         _quizzes[index] = quiz;
         
         // Update in Firebase if available
-        if (FirebaseService.isSupported) {
+        if (_isFirebaseAvailable) {
           debugPrint('Updating quiz in Firebase...');
-          await _firebaseService.updateData('quizzes/${quiz.id}', quiz.toJson());
-          debugPrint('Quiz updated in Firebase successfully');
+          final result = await _firebaseService.updateData('quizzes/${quiz.id}', quiz.toJson());
+          debugPrint('Quiz updated in Firebase: $result');
         } else {
           debugPrint('Firebase not available, updating only in local storage');
         }
@@ -225,10 +252,10 @@ class QuizProvider with ChangeNotifier {
       _quizzes.removeWhere((quiz) => quiz.id == quizId);
       
       // Remove from Firebase if available
-      if (FirebaseService.isSupported) {
+      if (_isFirebaseAvailable) {
         debugPrint('Deleting quiz from Firebase...');
-        await _firebaseService.deleteData('quizzes/$quizId');
-        debugPrint('Quiz deleted from Firebase successfully');
+        final result = await _firebaseService.deleteData('quizzes/$quizId');
+        debugPrint('Quiz deleted from Firebase: $result');
       } else {
         debugPrint('Firebase not available, deleting only from local storage');
       }

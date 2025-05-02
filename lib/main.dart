@@ -12,38 +12,29 @@ import 'package:firebase_database/firebase_database.dart';
 import 'dart:io' show Platform;
 import 'services/firebase_service.dart';
 
-Future<void> initializeApp() async {
-  debugPrint('Starting app initialization...');
-  
-  // Initialize Firebase
-  final firebaseService = FirebaseService.instance;
-  await firebaseService.initialize();
-  
-  debugPrint('Firebase initialization complete. Supported: ${FirebaseService.isSupported}');
-}
-
-void main() async {
+Future<void> runQuizBattleApp() async {
   try {
     debugPrint('Starting app initialization...');
     WidgetsFlutterBinding.ensureInitialized();
     debugPrint('Flutter binding initialized');
 
-    await initializeApp();
-    
+    // Initialize providers
     final settingsProvider = SettingsProvider();
     await settingsProvider.loadSettings();
     debugPrint('Settings loaded successfully');
 
     final quizProvider = QuizProvider();
     debugPrint('QuizProvider created');
-    await quizProvider.loadQuizzes();
-    debugPrint(
-      'Quizzes loaded successfully. Count: ${quizProvider.quizzes.length}',
-    );
-
+    
+    // Run the app
     runApp(
       MyApp(settingsProvider: settingsProvider, quizProvider: quizProvider),
     );
+    
+    // Load quizzes after UI is shown for better UX
+    await quizProvider.loadQuizzes();
+    debugPrint('Quizzes loaded: ${quizProvider.quizzes.length}');
+    
     debugPrint('App started successfully');
   } catch (e, stackTrace) {
     debugPrint('Critical error during initialization: $e');
@@ -75,7 +66,7 @@ void main() async {
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: () {
-                    main();
+                    runQuizBattleApp();
                   },
                   child: const Text('Попробовать снова'),
                 ),
@@ -86,6 +77,10 @@ void main() async {
       ),
     );
   }
+}
+
+void main() async {
+  runQuizBattleApp();
 }
 
 class MyApp extends StatelessWidget {
