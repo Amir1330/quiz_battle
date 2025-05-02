@@ -30,6 +30,24 @@ class QuizProvider with ChangeNotifier {
         ),
       ],
     ),
+    Quiz(
+      title: 'Science Quiz',
+      description: 'Test your science knowledge',
+      language: 'en',
+      isDefault: true,
+      questions: [
+        Question(
+          question: 'What is the chemical symbol for water?',
+          options: ['H2O', 'CO2', 'O2', 'NaCl'],
+          correctOptionIndex: 0,
+        ),
+        Question(
+          question: 'What planet is known as the Red Planet?',
+          options: ['Earth', 'Mars', 'Venus', 'Jupiter'],
+          correctOptionIndex: 1,
+        ),
+      ],
+    ),
   ];
 
   List<Quiz> get quizzes => _quizzes;
@@ -90,6 +108,7 @@ class QuizProvider with ChangeNotifier {
 
       if (snapshot != null && snapshot.exists && snapshot.value != null) {
         try {
+          debugPrint('Firebase data found, parsing quizzes...');
           final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
           _quizzes = data.entries
               .map((entry) {
@@ -115,6 +134,7 @@ class QuizProvider with ChangeNotifier {
         } catch (e) {
           debugPrint('Error parsing Firebase data: $e');
           _quizzes = List.from(_defaultQuizzes);
+          await _saveDefaultQuizzesToFirebase();
         }
       } else {
         debugPrint('No quizzes found in Firebase database, loading default quizzes');
@@ -140,10 +160,12 @@ class QuizProvider with ChangeNotifier {
     if (!_isFirebaseAvailable) return;
     
     try {
+      debugPrint('Saving default quizzes to Firebase...');
       for (final quiz in _defaultQuizzes) {
         final result = await _firebaseService.saveData('quizzes/${quiz.id}', quiz.toJson());
         debugPrint('Saved default quiz to Firebase (${quiz.title}): $result');
       }
+      debugPrint('All default quizzes saved to Firebase');
     } catch (e) {
       debugPrint('Error saving default quizzes to Firebase: $e');
     }
@@ -179,7 +201,7 @@ class QuizProvider with ChangeNotifier {
       final quizzesJson =
           _quizzes.map((quiz) => jsonEncode(quiz.toJson())).toList();
       await _prefs.setStringList(_quizzesKey, quizzesJson);
-      debugPrint('Quizzes saved to local storage');
+      debugPrint('Quizzes saved to local storage: ${_quizzes.length} quizzes');
     } catch (e) {
       debugPrint('Error saving quizzes to local storage: $e');
     }

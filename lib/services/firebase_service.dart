@@ -26,7 +26,7 @@ class FirebaseService {
     if (_initialized) return true;
 
     try {
-      debugPrint('🔥 Initializing Firebase...');
+      debugPrint('🔥 Initializing Firebase Service...');
       
       // Skip Firebase initialization on Linux
       if (Platform.isLinux) {
@@ -36,24 +36,27 @@ class FirebaseService {
         return false;
       }
 
-      // Initialize Firebase
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-      
-      // Enable persistence
+      // Check if Firebase is already initialized
       try {
-        FirebaseDatabase.instance.setPersistenceEnabled(true);
-        debugPrint('Firebase persistence enabled');
+        Firebase.app();
+        debugPrint('Firebase already initialized');
       } catch (e) {
-        debugPrint('Could not enable Firebase persistence: $e');
-        // Continue anyway
+        // Initialize Firebase if not already initialized
+        debugPrint('Initializing Firebase app');
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
       }
       
-      // Get database reference
-      _databaseRef = FirebaseDatabase.instance.ref();
+      // Get database reference with explicit URL to ensure correct database
+      _databaseRef = FirebaseDatabase.instanceFor(
+        app: Firebase.app(),
+        databaseURL: DefaultFirebaseOptions.currentPlatform.databaseURL,
+      ).ref();
       
-      // Test connection
+      debugPrint('Firebase Database reference initialized with URL: ${DefaultFirebaseOptions.currentPlatform.databaseURL}');
+      
+      // Test database connection
       try {
         final connectionRef = FirebaseDatabase.instance.ref('.info/connected');
         final snapshot = await connectionRef.get();
@@ -66,7 +69,6 @@ class FirebaseService {
         }
       } catch (e) {
         debugPrint('⚠️ Could not test Firebase connection: $e');
-        // Continue anyway
       }
       
       _initialized = true;
@@ -91,7 +93,9 @@ class FirebaseService {
     if (!isSupported || !_initialized || _databaseRef == null) return false;
     
     try {
+      debugPrint('Saving data to path: $path');
       await _databaseRef!.child(path).set(data);
+      debugPrint('Data saved successfully to: $path');
       return true;
     } catch (e) {
       debugPrint('Error saving data to $path: $e');
@@ -103,7 +107,9 @@ class FirebaseService {
     if (!isSupported || !_initialized || _databaseRef == null) return false;
     
     try {
+      debugPrint('Updating data at path: $path');
       await _databaseRef!.child(path).update(data);
+      debugPrint('Data updated successfully at: $path');
       return true;
     } catch (e) {
       debugPrint('Error updating data at $path: $e');
@@ -115,7 +121,10 @@ class FirebaseService {
     if (!isSupported || !_initialized || _databaseRef == null) return null;
     
     try {
-      return await _databaseRef!.child(path).get();
+      debugPrint('Getting data from path: $path');
+      final snapshot = await _databaseRef!.child(path).get();
+      debugPrint('Data retrieved successfully from: $path');
+      return snapshot;
     } catch (e) {
       debugPrint('Error getting data from $path: $e');
       return null;
@@ -126,7 +135,9 @@ class FirebaseService {
     if (!isSupported || !_initialized || _databaseRef == null) return false;
     
     try {
+      debugPrint('Deleting data at path: $path');
       await _databaseRef!.child(path).remove();
+      debugPrint('Data deleted successfully at: $path');
       return true;
     } catch (e) {
       debugPrint('Error deleting data at $path: $e');
@@ -143,6 +154,7 @@ class FirebaseService {
         updates['/quizzes/${quiz.id}'] = quiz.toJson();
       }
       await _databaseRef!.update(updates);
+      debugPrint('Default quizzes imported successfully: ${quizzes.length} quizzes');
     } catch (e) {
       debugPrint('Error importing default quizzes: $e');
     }

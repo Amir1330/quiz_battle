@@ -18,6 +18,23 @@ Future<void> runQuizBattleApp() async {
     WidgetsFlutterBinding.ensureInitialized();
     debugPrint('Flutter binding initialized');
 
+    // Initialize Firebase with the new project configuration
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    
+    debugPrint('Firebase initialized with project: ${DefaultFirebaseOptions.currentPlatform.projectId}');
+    
+    if (!Platform.isLinux) {
+      // Enable persistence for Realtime Database
+      try {
+        FirebaseDatabase.instance.setPersistenceEnabled(true);
+        debugPrint('Firebase Realtime Database persistence enabled');
+      } catch (e) {
+        debugPrint('Could not enable Firebase persistence: $e');
+      }
+    }
+
     // Initialize providers
     final settingsProvider = SettingsProvider();
     await settingsProvider.loadSettings();
