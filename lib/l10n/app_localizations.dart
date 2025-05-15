@@ -18,13 +18,13 @@ abstract class AppLocalizations {
   String get systemTheme;
   String get lightTheme;
   String get darkTheme;
-  
+
   // Home screen navigation
   String get play;
   String get myQuizzes;
   String get create;
   String get settings;
-  
+
   // Quiz related
   String get createQuiz;
   String get title;
@@ -53,7 +53,7 @@ abstract class AppLocalizations {
   String get creatingQuiz;
   String get quizCreatedSuccessfully;
   String get done;
-  
+
   // Authentication
   String get login;
   String get signup;
@@ -65,11 +65,11 @@ abstract class AppLocalizations {
   String get signupError;
   String get logout;
   String get loginRequired;
-  
+
   // Session handling
   String get sessionExpired;
   String get ok;
-  
+
   // Quiz play
   String get startQuiz;
   String get nextQuestion;
@@ -79,9 +79,23 @@ abstract class AppLocalizations {
   String get correctAnswers;
   String get totalQuestions;
   String get retry;
+  String get quizCompleted;
+  String get errorSavingResults;
+
+  // Guest mode
+  String get continueAsGuest;
+  String get registrationRequired;
+
+  // Quiz history
+  String get quizHistory;
+  String get noHistoryFound;
+  String get score;
+  String get timeSpent;
+  String get seconds;
 }
 
-class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
@@ -103,4 +117,4 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
-} 
+}

@@ -4,6 +4,8 @@ import 'package:quizzz/models/quiz.dart';
 import 'package:quizzz/providers/auth_provider.dart';
 import 'package:quizzz/providers/quiz_provider.dart';
 import 'package:quizzz/screens/quizzes/quiz_details_screen.dart';
+import 'package:quizzz/l10n/app_localizations.dart';
+import 'package:quizzz/screens/auth/login_screen.dart';
 
 class MyQuizzesScreen extends StatefulWidget {
   const MyQuizzesScreen({super.key});
@@ -12,7 +14,8 @@ class MyQuizzesScreen extends StatefulWidget {
   State<MyQuizzesScreen> createState() => _MyQuizzesScreenState();
 }
 
-class _MyQuizzesScreenState extends State<MyQuizzesScreen> with AutomaticKeepAliveClientMixin {
+class _MyQuizzesScreenState extends State<MyQuizzesScreen>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => false; // Don't keep state alive between tab switches
 
@@ -28,19 +31,23 @@ class _MyQuizzesScreenState extends State<MyQuizzesScreen> with AutomaticKeepAli
   Future<void> _loadMyQuizzes() async {
     debugPrint('Loading my quizzes in MyQuizzesScreen');
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final currentUser = authProvider.user;  // Use the corrected user getter
-    
+    final currentUser = authProvider.user; // Use the corrected user getter
+
     if (currentUser != null) {
-      debugPrint('Authenticated user found: ${currentUser.email}, loading quizzes for ${currentUser.uid}');
+      debugPrint(
+        'Authenticated user found: ${currentUser.email}, loading quizzes for ${currentUser.uid}',
+      );
       try {
-        await Provider.of<QuizProvider>(context, listen: false)
-            .loadMyQuizzes(currentUser.uid);
+        await Provider.of<QuizProvider>(
+          context,
+          listen: false,
+        ).loadMyQuizzes(currentUser.uid);
       } catch (e) {
         debugPrint('Error loading quizzes: $e');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error loading quizzes: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error loading quizzes: $e')));
         }
       }
     } else {
@@ -51,13 +58,15 @@ class _MyQuizzesScreenState extends State<MyQuizzesScreen> with AutomaticKeepAli
   Future<void> _refreshMyQuizzes() async {
     debugPrint('Refreshing my quizzes');
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final currentUser = authProvider.user;  // Use the corrected user getter
-    
+    final currentUser = authProvider.user; // Use the corrected user getter
+
     if (currentUser != null) {
       debugPrint('Refreshing quizzes for user ${currentUser.uid}');
       try {
-        await Provider.of<QuizProvider>(context, listen: false)
-            .loadMyQuizzes(currentUser.uid);
+        await Provider.of<QuizProvider>(
+          context,
+          listen: false,
+        ).loadMyQuizzes(currentUser.uid);
       } catch (e) {
         debugPrint('Error refreshing quizzes: $e');
         if (mounted) {
@@ -74,42 +83,45 @@ class _MyQuizzesScreenState extends State<MyQuizzesScreen> with AutomaticKeepAli
         );
       }
     }
-    
+
     return Future.value();
   }
 
   Future<void> _deleteQuiz(Quiz quiz) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Quiz'),
-        content: const Text('Are you sure you want to delete this quiz?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Quiz'),
+            content: const Text('Are you sure you want to delete this quiz?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Delete'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true) {
       try {
-        await Provider.of<QuizProvider>(context, listen: false)
-            .deleteQuiz(quiz.id);
+        await Provider.of<QuizProvider>(
+          context,
+          listen: false,
+        ).deleteQuiz(context, quiz.id);
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Quiz deleted successfully')),
         );
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     }
   }
@@ -118,12 +130,44 @@ class _MyQuizzesScreenState extends State<MyQuizzesScreen> with AutomaticKeepAli
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     final quizProvider = Provider.of<QuizProvider>(context);
+    final localizations = AppLocalizations.of(context);
 
-    return RefreshIndicator(
-      onRefresh: _refreshMyQuizzes,
-      child: Stack(
+    if (Provider.of<AuthProvider>(context).isGuest) {
+      return Scaffold(
+        appBar: AppBar(title: Text(localizations.myQuizzes)),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  localizations.registrationRequired,
+                  style: Theme.of(context).textTheme.titleLarge,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (route) => false,
+                    );
+                  },
+                  child: Text(localizations.signup),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: Text(localizations.myQuizzes)),
+      body: Stack(
         children: [
-          if (quizProvider.myQuizzes.isEmpty && !quizProvider.isLoading)
+          if (quizProvider.quizzes.isEmpty && !quizProvider.isLoading)
             Center(
               child: Padding(
                 padding: const EdgeInsets.all(20.0),
@@ -139,7 +183,9 @@ class _MyQuizzesScreenState extends State<MyQuizzesScreen> with AutomaticKeepAli
                         padding: const EdgeInsets.only(top: 16.0),
                         child: Text(
                           'Error: ${quizProvider.error}',
-                          style: TextStyle(color: Theme.of(context).colorScheme.error),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -154,12 +200,12 @@ class _MyQuizzesScreenState extends State<MyQuizzesScreen> with AutomaticKeepAli
                 ),
               ),
             ),
-          if (quizProvider.myQuizzes.isNotEmpty)
+          if (quizProvider.quizzes.isNotEmpty)
             ListView.builder(
               padding: const EdgeInsets.all(16.0),
-              itemCount: quizProvider.myQuizzes.length,
+              itemCount: quizProvider.quizzes.length,
               itemBuilder: (context, index) {
-                final quiz = quizProvider.myQuizzes[index];
+                final quiz = quizProvider.quizzes[index];
                 return Card(
                   margin: const EdgeInsets.only(bottom: 16.0),
                   child: ListTile(
@@ -190,10 +236,8 @@ class _MyQuizzesScreenState extends State<MyQuizzesScreen> with AutomaticKeepAli
                 );
               },
             ),
-          if (quizProvider.isLoading && quizProvider.myQuizzes.isEmpty)
-            const Center(
-              child: CircularProgressIndicator(),
-            ),
+          if (quizProvider.isLoading && quizProvider.quizzes.isEmpty)
+            const Center(child: CircularProgressIndicator()),
         ],
       ),
     );
@@ -214,4 +258,4 @@ class _MyQuizzesScreenState extends State<MyQuizzesScreen> with AutomaticKeepAli
       return '${date.day}/${date.month}/${date.year}';
     }
   }
-} 
+}

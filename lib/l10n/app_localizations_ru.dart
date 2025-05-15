@@ -14,7 +14,7 @@ class AppLocalizationsRu implements AppLocalizations {
   String get lightTheme => 'Светлая';
   @override
   String get darkTheme => 'Темная';
-  
+
   // Home screen navigation
   @override
   String get play => 'Играть';
@@ -24,7 +24,7 @@ class AppLocalizationsRu implements AppLocalizations {
   String get create => 'Создать';
   @override
   String get settings => 'Настройки';
-  
+
   // Quiz related
   @override
   String get createQuiz => 'Создать Викторину';
@@ -35,7 +35,8 @@ class AppLocalizationsRu implements AppLocalizations {
   @override
   String get timeLimit => 'Ограничение времени';
   @override
-  String get timeLimitOptional => 'Ограничение времени (секунды, необязательно)';
+  String get timeLimitOptional =>
+      'Ограничение времени (секунды, необязательно)';
   @override
   String get questions => 'Вопросы';
   @override
@@ -59,13 +60,15 @@ class AppLocalizationsRu implements AppLocalizations {
   @override
   String get deleteQuiz => 'Удалить Викторину';
   @override
-  String get deleteQuizConfirmation => 'Вы уверены, что хотите удалить эту викторину?';
+  String get deleteQuizConfirmation =>
+      'Вы уверены, что хотите удалить эту викторину?';
   @override
   String get noQuestionsAdded => 'Вопросы еще не добавлены.';
   @override
   String get pleaseAddQuestion => 'Пожалуйста, добавьте хотя бы один вопрос';
   @override
-  String get noQuizzesAvailable => 'Викторины пока недоступны. Будьте первым, кто создаст!';
+  String get noQuizzesAvailable =>
+      'Викторины пока недоступны. Будьте первым, кто создаст!';
   @override
   String get noMyQuizzesAvailable => 'Вы еще не создали ни одной викторины.';
   @override
@@ -80,7 +83,7 @@ class AppLocalizationsRu implements AppLocalizations {
   String get quizCreatedSuccessfully => 'Викторина успешно создана!';
   @override
   String get done => 'Готово';
-  
+
   // Authentication
   @override
   String get login => 'Вход';
@@ -97,12 +100,14 @@ class AppLocalizationsRu implements AppLocalizations {
   @override
   String get loginError => 'Ошибка входа. Проверьте свои учетные данные.';
   @override
-  String get signupError => 'Регистрация не удалась. Пожалуйста, попробуйте снова.';
+  String get signupError =>
+      'Регистрация не удалась. Пожалуйста, попробуйте снова.';
   @override
   String get logout => 'Выйти';
   @override
-  String get loginRequired => 'Вы должны войти в систему, чтобы создать викторину';
-  
+  String get loginRequired =>
+      'Вы должны войти в систему, чтобы создать викторину';
+
   // Quiz play
   @override
   String get startQuiz => 'Начать Викторину';
@@ -120,10 +125,35 @@ class AppLocalizationsRu implements AppLocalizations {
   String get totalQuestions => 'Всего Вопросов';
   @override
   String get retry => 'Повторить';
-  
+
   // Session handling
   @override
-  String get sessionExpired => 'Срок действия вашей сессии истек. Пожалуйста, войдите снова.';
+  String get sessionExpired =>
+      'Срок действия вашей сессии истек. Пожалуйста, войдите снова.';
   @override
   String get ok => 'OK';
-} 
+
+  // Guest mode
+  @override
+  String get continueAsGuest => 'Продолжить как гость';
+
+  @override
+  String get registrationRequired =>
+      'Для создания квизов необходимо зарегистрироваться';
+
+  @override
+  String get quizHistory => 'История викторин';
+  @override
+  String get noHistoryFound => 'История не найдена';
+  @override
+  String get score => 'Счёт';
+  @override
+  String get timeSpent => 'Затраченное время';
+  @override
+  String get seconds => 'секунд';
+
+  @override
+  String get quizCompleted => 'Викторина завершена';
+  @override
+  String get errorSavingResults => 'Ошибка сохранения результатов';
+}

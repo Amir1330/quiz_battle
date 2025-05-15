@@ -4,6 +4,7 @@ import 'package:quizzz/models/quiz.dart';
 import 'package:quizzz/providers/auth_provider.dart';
 import 'package:quizzz/providers/quiz_provider.dart';
 import 'package:quizzz/l10n/app_localizations.dart';
+import 'package:quizzz/screens/auth/login_screen.dart';
 
 class CreateQuizScreen extends StatefulWidget {
   const CreateQuizScreen({super.key});
@@ -30,8 +31,8 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
   }
 
   Future<void> _createQuiz() async {
-    if (_isSubmitting) return; // Prevent multiple submissions
-    
+    if (_isSubmitting) return;
+
     if (!_formKey.currentState!.validate()) return;
     if (_questions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -49,28 +50,32 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final quizProvider = Provider.of<QuizProvider>(context, listen: false);
 
-      // Force a check for the current user
       final currentUser = authProvider.user;
-      debugPrint('Auth status when creating quiz: isAuthenticated=${authProvider.isAuthenticated}, user=${currentUser?.email}');
+      debugPrint(
+        'Auth status when creating quiz: isAuthenticated=${authProvider.isAuthenticated}, user=${currentUser?.email}',
+      );
 
       if (currentUser == null) {
-        // Show a dialog to inform the user they need to log in again
         if (mounted) {
           showDialog(
             context: context,
-            builder: (context) => AlertDialog(
-              title: Text(AppLocalizations.of(context).loginRequired),
-              content: Text(AppLocalizations.of(context).sessionExpired ?? 'Your session has expired. Please log in again.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(AppLocalizations.of(context).ok),
+            builder:
+                (context) => AlertDialog(
+                  title: Text(AppLocalizations.of(context).loginRequired),
+                  content: Text(
+                    AppLocalizations.of(context).sessionExpired ??
+                        'Your session has expired. Please log in again.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text(AppLocalizations.of(context).ok),
+                    ),
+                  ],
                 ),
-              ],
-            ),
           );
         }
-        
+
         setState(() {
           _errorMessage = AppLocalizations.of(context).loginRequired;
           _isSubmitting = false;
@@ -78,23 +83,26 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
         return;
       }
 
-      await quizProvider.createQuiz(
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        creatorId: currentUser.uid,
-        creatorEmail: currentUser.email!,
-        questions: _questions,
-        timeLimit: int.tryParse(_timeLimitController.text) ?? 0,
-      );
+      final quizData = {
+        'title': _titleController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'questions': _questions.map((q) => q.toJson()).toList(),
+        'timeLimit': int.tryParse(_timeLimitController.text) ?? 0,
+      };
+
+      await quizProvider.createQuiz(context, quizData);
 
       if (!mounted) return;
-      
-      // Show success message
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).quizCreatedSuccessfully ?? 'Quiz created successfully!')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context).quizCreatedSuccessfully ??
+                'Quiz created successfully!',
+          ),
+        ),
       );
-      
-      // Reset the form data
+
       setState(() {
         _titleController.clear();
         _descriptionController.clear();
@@ -105,7 +113,8 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = '${AppLocalizations.of(context).errorCreatingQuiz}: ${e.toString()}';
+        _errorMessage =
+            '${AppLocalizations.of(context).errorCreatingQuiz}: ${e.toString()}';
         _isSubmitting = false;
       });
     }
@@ -114,27 +123,29 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
   void _addQuestion() {
     showDialog(
       context: context,
-      builder: (context) => QuestionDialog(
-        onSave: (question) {
-          setState(() {
-            _questions.add(question);
-          });
-        },
-      ),
+      builder:
+          (context) => QuestionDialog(
+            onSave: (question) {
+              setState(() {
+                _questions.add(question);
+              });
+            },
+          ),
     );
   }
 
   void _editQuestion(int index) {
     showDialog(
       context: context,
-      builder: (context) => QuestionDialog(
-        question: _questions[index],
-        onSave: (question) {
-          setState(() {
-            _questions[index] = question;
-          });
-        },
-      ),
+      builder:
+          (context) => QuestionDialog(
+            question: _questions[index],
+            onSave: (question) {
+              setState(() {
+                _questions[index] = question;
+              });
+            },
+          ),
     );
   }
 
@@ -147,14 +158,43 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
   @override
   Widget build(BuildContext context) {
     final quizProvider = Provider.of<QuizProvider>(context);
-    
-    // Use the provider's loading state as well
+    final authProvider = Provider.of<AuthProvider>(context);
     final isLoading = _isSubmitting || quizProvider.isLoading;
+    final localizations = AppLocalizations.of(context);
+
+    if (authProvider.isGuest) {
+      return Scaffold(
+        appBar: AppBar(title: Text(localizations.createQuiz)),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  localizations.registrationRequired,
+                  style: Theme.of(context).textTheme.titleLarge,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (route) => false,
+                    );
+                  },
+                  child: Text(localizations.signup),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Quiz'),
-      ),
+      appBar: AppBar(title: Text(localizations.createQuiz)),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -211,10 +251,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 24),
-            Text(
-              'Questions',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            Text('Questions', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
             ...List.generate(
               _questions.length,
@@ -222,19 +259,19 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
                 margin: const EdgeInsets.only(bottom: 8.0),
                 child: ListTile(
                   title: Text(_questions[index].question),
-                  subtitle: Text(
-                    '${_questions[index].options.length} options',
-                  ),
+                  subtitle: Text('${_questions[index].options.length} options'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
                         icon: const Icon(Icons.edit),
-                        onPressed: isLoading ? null : () => _editQuestion(index),
+                        onPressed:
+                            isLoading ? null : () => _editQuestion(index),
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete),
-                        onPressed: isLoading ? null : () => _deleteQuestion(index),
+                        onPressed:
+                            isLoading ? null : () => _deleteQuestion(index),
                       ),
                     ],
                   ),
@@ -250,20 +287,21 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: isLoading ? null : _createQuiz,
-              child: isLoading
-                  ? const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        SizedBox(width: 12),
-                        Text('Creating Quiz...'),
-                      ],
-                    )
-                  : const Text('Create Quiz'),
+              child:
+                  isLoading
+                      ? const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          SizedBox(width: 12),
+                          Text('Creating Quiz...'),
+                        ],
+                      )
+                      : const Text('Create Quiz'),
             ),
           ],
         ),
@@ -276,11 +314,7 @@ class QuestionDialog extends StatefulWidget {
   final Question? question;
   final Function(Question) onSave;
 
-  const QuestionDialog({
-    super.key,
-    this.question,
-    required this.onSave,
-  });
+  const QuestionDialog({super.key, this.question, required this.onSave});
 
   @override
   State<QuestionDialog> createState() => _QuestionDialogState();
@@ -400,11 +434,8 @@ class _QuestionDialogState extends State<QuestionDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        ElevatedButton(
-          onPressed: _saveQuestion,
-          child: const Text('Save'),
-        ),
+        ElevatedButton(onPressed: _saveQuestion, child: const Text('Save')),
       ],
     );
   }
-} 
+}

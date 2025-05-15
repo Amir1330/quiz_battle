@@ -14,7 +14,7 @@ class AppLocalizationsKk implements AppLocalizations {
   String get lightTheme => 'Жарық';
   @override
   String get darkTheme => 'Қараңғы';
-  
+
   // Home screen navigation
   @override
   String get play => 'Ойнау';
@@ -24,7 +24,7 @@ class AppLocalizationsKk implements AppLocalizations {
   String get create => 'Жасау';
   @override
   String get settings => 'Параметрлер';
-  
+
   // Quiz related
   @override
   String get createQuiz => 'Викторина жасау';
@@ -65,7 +65,8 @@ class AppLocalizationsKk implements AppLocalizations {
   @override
   String get pleaseAddQuestion => 'Кем дегенде бір сұрақ қосыңыз';
   @override
-  String get noQuizzesAvailable => 'Әзірге викториналар жоқ. Алғашқы болып жасаңыз!';
+  String get noQuizzesAvailable =>
+      'Әзірге викториналар жоқ. Алғашқы болып жасаңыз!';
   @override
   String get noMyQuizzesAvailable => 'Сіз әлі бірде-бір викторина жасамадыңыз.';
   @override
@@ -80,7 +81,7 @@ class AppLocalizationsKk implements AppLocalizations {
   String get quizCreatedSuccessfully => 'Викторина сәтті жасалды!';
   @override
   String get done => 'Дайын';
-  
+
   // Authentication
   @override
   String get login => 'Кіру';
@@ -95,14 +96,15 @@ class AppLocalizationsKk implements AppLocalizations {
   @override
   String get forgotPassword => 'Құпия сөзді ұмыттыңыз ба?';
   @override
-  String get loginError => 'Кіру сәтсіз аяқталды. Тіркелгі деректерін тексеріңіз.';
+  String get loginError =>
+      'Кіру сәтсіз аяқталды. Тіркелгі деректерін тексеріңіз.';
   @override
   String get signupError => 'Тіркелу сәтсіз аяқталды. Қайталап көріңіз.';
   @override
   String get logout => 'Шығу';
   @override
   String get loginRequired => 'Викторина жасау үшін жүйеге кіруіңіз керек';
-  
+
   // Quiz play
   @override
   String get startQuiz => 'Викторинаны бастау';
@@ -120,10 +122,38 @@ class AppLocalizationsKk implements AppLocalizations {
   String get totalQuestions => 'Барлық сұрақтар';
   @override
   String get retry => 'Қайталау';
-  
+
   // Session handling
   @override
   String get sessionExpired => 'Сеансыңыздың мерзімі аяқталды. Қайта кіріңіз.';
   @override
   String get ok => 'OK';
-} 
+
+  // Guest mode
+  @override
+  String get continueAsGuest => 'Қонақ ретінде жалғастыру';
+
+  @override
+  String get registrationRequired => 'Викторина жасау үшін тіркелу қажет';
+
+  @override
+  String get quizHistory => 'Викторина тарихы';
+
+  @override
+  String get noHistoryFound => 'Викторина тарихы табылмады';
+
+  @override
+  String get quizCompleted => 'Викторина аяқталды';
+
+  @override
+  String get errorSavingResults => 'Викторина нәтижелерін сақтау қатесі';
+
+  @override
+  String get timeSpent => 'Жұмсалған уақыт';
+
+  @override
+  String get score => 'Ұпай';
+
+  @override
+  String get seconds => 'секунд';
+}

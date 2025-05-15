@@ -14,7 +14,7 @@ class AppLocalizationsEn implements AppLocalizations {
   String get lightTheme => 'Light';
   @override
   String get darkTheme => 'Dark';
-  
+
   // Home screen navigation
   @override
   String get play => 'Play';
@@ -24,7 +24,7 @@ class AppLocalizationsEn implements AppLocalizations {
   String get create => 'Create';
   @override
   String get settings => 'Settings';
-  
+
   // Quiz related
   @override
   String get createQuiz => 'Create Quiz';
@@ -59,13 +59,15 @@ class AppLocalizationsEn implements AppLocalizations {
   @override
   String get deleteQuiz => 'Delete Quiz';
   @override
-  String get deleteQuizConfirmation => 'Are you sure you want to delete this quiz?';
+  String get deleteQuizConfirmation =>
+      'Are you sure you want to delete this quiz?';
   @override
   String get noQuestionsAdded => 'No questions added yet.';
   @override
   String get pleaseAddQuestion => 'Please add at least one question';
   @override
-  String get noQuizzesAvailable => 'No quizzes available yet. Be the first to create one!';
+  String get noQuizzesAvailable =>
+      'No quizzes available yet. Be the first to create one!';
   @override
   String get noMyQuizzesAvailable => 'You haven\'t created any quizzes yet.';
   @override
@@ -80,7 +82,7 @@ class AppLocalizationsEn implements AppLocalizations {
   String get quizCreatedSuccessfully => 'Quiz created successfully!';
   @override
   String get done => 'Done';
-  
+
   // Authentication
   @override
   String get login => 'Login';
@@ -102,7 +104,7 @@ class AppLocalizationsEn implements AppLocalizations {
   String get logout => 'Logout';
   @override
   String get loginRequired => 'You must be logged in to create a quiz';
-  
+
   // Quiz play
   @override
   String get startQuiz => 'Start Quiz';
@@ -120,10 +122,39 @@ class AppLocalizationsEn implements AppLocalizations {
   String get totalQuestions => 'Total Questions';
   @override
   String get retry => 'Retry';
-  
+
   // Session handling
   @override
   String get sessionExpired => 'Your session has expired. Please log in again.';
   @override
   String get ok => 'OK';
-} 
+
+  // Guest mode
+  @override
+  String get continueAsGuest => 'Continue as Guest';
+
+  @override
+  String get registrationRequired =>
+      'Registration is required to create quizzes';
+
+  @override
+  String get quizHistory => 'Quiz History';
+
+  @override
+  String get noHistoryFound => 'No quiz history found';
+
+  @override
+  String get quizCompleted => 'Quiz Completed';
+
+  @override
+  String get errorSavingResults => 'Error saving quiz results';
+
+  @override
+  String get timeSpent => 'Time Spent';
+
+  @override
+  String get score => 'Score';
+
+  @override
+  String get seconds => 'seconds';
+}

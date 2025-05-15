@@ -6,60 +6,70 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthProvider with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final DatabaseReference _database = FirebaseDatabase.instanceFor(
-    app: Firebase.app(),
-    databaseURL: 'https://quizzz-79fa5-default-rtdb.europe-west1.firebasedatabase.app',
-  ).ref();
+  final DatabaseReference _database =
+      FirebaseDatabase.instanceFor(
+        app: Firebase.app(),
+        databaseURL:
+            'https://quizzz-79fa5-default-rtdb.europe-west1.firebasedatabase.app',
+      ).ref();
   User? _user;
   bool _isLoading = false;
   bool _initialized = false;
+  bool _isGuest = false;
 
   User? get user => _auth.currentUser ?? _user;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _auth.currentUser != null;
   bool get isInitialized => _initialized;
+  bool get isGuest => _isGuest;
+  bool get canCreateQuiz => isAuthenticated && !isGuest;
 
   AuthProvider() {
     _initializeAuth();
   }
-  
+
   Future<void> _initializeAuth() async {
     debugPrint('Initializing AuthProvider...');
-    
+
     try {
       // Set persistence to LOCAL to keep user logged in across app restarts
       await _auth.setPersistence(Persistence.LOCAL);
-      
+
       // Check if a user is already signed in
       _user = _auth.currentUser;
-      debugPrint('Initial auth state: ${_user != null ? 'Logged in as ${_user!.email}' : 'Not logged in'}');
-      
+      debugPrint(
+        'Initial auth state: ${_user != null ? 'Logged in as ${_user!.email}' : 'Not logged in'}',
+      );
+
       // Listen for auth state changes
       _auth.authStateChanges().listen((User? user) {
-        debugPrint('Auth state changed: ${user != null ? 'Logged in as ${user.email}' : 'Not logged in'}');
+        debugPrint(
+          'Auth state changed: ${user != null ? 'Logged in as ${user.email}' : 'Not logged in'}',
+        );
         _user = user;
         _saveAuthState(user != null);
         notifyListeners();
       });
-      
+
       // Force an extra check to ensure we have the latest auth state
       Future.delayed(const Duration(seconds: 1), () {
         final currentUser = _auth.currentUser;
-        if (currentUser != null && (_user == null || currentUser.uid != _user!.uid)) {
+        if (currentUser != null &&
+            (_user == null || currentUser.uid != _user!.uid)) {
           debugPrint('Auth state corrected: Logged in as ${currentUser.email}');
           _user = currentUser;
           _saveAuthState(true);
           notifyListeners();
         }
       });
-      
+
       _initialized = true;
       notifyListeners();
     } catch (e) {
       debugPrint('Error initializing auth: $e');
     }
   }
-  
+
   // Helper method to save authentication state
   Future<void> _saveAuthState(bool isLoggedIn) async {
     try {
@@ -71,17 +81,37 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  String? validatePassword(String password) {
+    if (password.isEmpty) {
+      return 'Password cannot be empty';
+    }
+    if (password.length < 6) {
+      return 'Password must be at least 6 characters long';
+    }
+    if (!password.contains(RegExp(r'[A-Z]'))) {
+      return 'Password must contain at least one uppercase letter';
+    }
+    if (!password.contains(RegExp(r'[0-9]'))) {
+      return 'Password must contain at least one number';
+    }
+    return null;
+  }
+
   Future<void> signUp(String email, String password) async {
+    final passwordError = validatePassword(password);
+    if (passwordError != null) {
+      throw passwordError;
+    }
     try {
       _isLoading = true;
       notifyListeners();
-      
+
       // Create user in Firebase Auth
       final userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-      
+
       if (userCredential.user != null) {
         try {
           // Create user data in Realtime Database
@@ -89,7 +119,7 @@ class AuthProvider with ChangeNotifier {
             'email': email,
             'createdAt': ServerValue.timestamp,
           });
-          
+
           // Save auth state
           await _saveAuthState(true);
         } catch (dbError) {
@@ -125,13 +155,51 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  Future<void> signInAsGuest() async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      // Создаем временного пользователя с уникальным email
+      final guestEmail =
+          'guest_${DateTime.now().millisecondsSinceEpoch}@guest.com';
+      final guestPassword = 'Guest${DateTime.now().millisecondsSinceEpoch}';
+
+      final userCredential = await _auth.createUserWithEmailAndPassword(
+        email: guestEmail,
+        password: guestPassword,
+      );
+
+      if (userCredential.user != null) {
+        _isGuest = true;
+        _user = userCredential.user;
+
+        // Создаем запись в базе данных для гостя
+        await _database.child('users/${userCredential.user!.uid}').set({
+          'email': guestEmail,
+          'isGuest': true,
+          'createdAt': ServerValue.timestamp,
+        });
+
+        await _saveAuthState(true);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error signing in as guest: $e');
+      throw 'Не удалось войти как гость: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> signIn(String email, String password) async {
     try {
       _isLoading = true;
       notifyListeners();
-      
+
       debugPrint('Signing in user with email: $email');
-      
+
       // Sign in user
       final userCredential = await _auth.signInWithEmailAndPassword(
         email: email,
@@ -142,10 +210,9 @@ class AuthProvider with ChangeNotifier {
 
       // Verify user data exists in database
       if (userCredential.user != null) {
-        final userData = await _database
-            .child('users/${userCredential.user!.uid}')
-            .get();
-        
+        final userData =
+            await _database.child('users/${userCredential.user!.uid}').get();
+
         if (!userData.exists) {
           // If user data doesn't exist, create it
           await _database.child('users/${userCredential.user!.uid}').set({
@@ -153,12 +220,14 @@ class AuthProvider with ChangeNotifier {
             'createdAt': ServerValue.timestamp,
           });
         }
-        
-        // Save auth state
+
+        _isGuest = false;
         await _saveAuthState(true);
       }
     } on FirebaseAuthException catch (e) {
-      debugPrint('Firebase auth exception during sign in: ${e.code} - ${e.message}');
+      debugPrint(
+        'Firebase auth exception during sign in: ${e.code} - ${e.message}',
+      );
       String message;
       switch (e.code) {
         case 'user-not-found':
@@ -192,6 +261,7 @@ class AuthProvider with ChangeNotifier {
   Future<void> signOut() async {
     try {
       await _auth.signOut();
+      _isGuest = false;
       await _saveAuthState(false);
       debugPrint('User signed out successfully');
     } catch (e) {
@@ -199,4 +269,4 @@ class AuthProvider with ChangeNotifier {
       throw 'An error occurred while signing out: $e';
     }
   }
-} 
+}

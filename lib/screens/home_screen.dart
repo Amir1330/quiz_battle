@@ -37,12 +37,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _refreshCurrentTab();
     });
   }
-  
+
   // Helper method to refresh data for the current tab
   void _refreshCurrentTab() {
     final quizProvider = Provider.of<QuizProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
+
     if (_selectedIndex == 0) {
       // Play tab
       debugPrint('Refreshing Play tab data');
@@ -59,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_selectedIndex != index) {
       final quizProvider = Provider.of<QuizProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       // Always refresh when navigating to tabs with quizzes
       if (index == 0) {
         // Play tab - refresh all quizzes
@@ -70,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
         debugPrint('Navigating to My Quizzes tab, refreshing my quizzes');
         quizProvider.loadMyQuizzes(authProvider.user!.uid);
       }
-      
+
       setState(() {
         _selectedIndex = index;
       });
@@ -81,7 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final localizations = AppLocalizations.of(context);
-    
+
     // Get fresh screens to avoid stale data
     final screens = _getScreens();
 
@@ -89,17 +89,23 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(localizations.appTitle),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await authProvider.signOut();
-              if (!mounted) return;
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-              );
-            },
-            tooltip: localizations.logout,
-          ),
+          if (authProvider.isAuthenticated)
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: () async {
+                await authProvider.signOut();
+                if (!mounted) return;
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                );
+              },
+              tooltip: localizations.logout,
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.login),
+              onPressed: () => Navigator.of(context).pushNamed('/login'),
+            ),
         ],
       ),
       body: screens[_selectedIndex],
@@ -127,4 +133,4 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-} 
+}

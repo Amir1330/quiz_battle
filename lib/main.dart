@@ -7,12 +7,15 @@ import 'package:quizzz/providers/auth_provider.dart';
 import 'package:quizzz/providers/quiz_provider.dart';
 import 'package:quizzz/providers/language_provider.dart';
 import 'package:quizzz/screens/splash_screen.dart';
+import 'package:quizzz/screens/auth/login_screen.dart';
 import 'package:quizzz/l10n/app_localizations.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Firebase
   try {
     await Firebase.initializeApp();
@@ -20,7 +23,7 @@ void main() async {
   } catch (e) {
     debugPrint('Error initializing Firebase: $e');
   }
-  
+
   runApp(const MyApp());
 }
 
@@ -39,6 +42,7 @@ class MyApp extends StatelessWidget {
       child: Consumer2<ThemeProvider, LanguageProvider>(
         builder: (context, themeProvider, languageProvider, child) {
           return MaterialApp(
+            navigatorKey: navigatorKey,
             title: 'Quizzz',
             debugShowCheckedModeBanner: false,
             theme: ThemeData.light(useMaterial3: true),
@@ -51,12 +55,9 @@ class MyApp extends StatelessWidget {
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
-            supportedLocales: const [
-              Locale('en'),
-              Locale('ru'),
-              Locale('kk'),
-            ],
+            supportedLocales: const [Locale('en'), Locale('ru'), Locale('kk')],
             home: const SplashScreen(),
+            routes: {'/login': (context) => const LoginScreen()},
           );
         },
       ),

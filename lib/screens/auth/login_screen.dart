@@ -40,9 +40,10 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               ListTile(
                 title: const Text('English'),
-                trailing: languageProvider.locale?.languageCode == 'en'
-                    ? const Icon(Icons.check, color: Colors.green)
-                    : null,
+                trailing:
+                    languageProvider.locale?.languageCode == 'en'
+                        ? const Icon(Icons.check, color: Colors.green)
+                        : null,
                 onTap: () {
                   languageProvider.setLocale('en');
                   Navigator.pop(context);
@@ -50,9 +51,10 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               ListTile(
                 title: const Text('Русский'),
-                trailing: languageProvider.locale?.languageCode == 'ru'
-                    ? const Icon(Icons.check, color: Colors.green)
-                    : null,
+                trailing:
+                    languageProvider.locale?.languageCode == 'ru'
+                        ? const Icon(Icons.check, color: Colors.green)
+                        : null,
                 onTap: () {
                   languageProvider.setLocale('ru');
                   Navigator.pop(context);
@@ -60,9 +62,10 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               ListTile(
                 title: const Text('Қазақша'),
-                trailing: languageProvider.locale?.languageCode == 'kk'
-                    ? const Icon(Icons.check, color: Colors.green)
-                    : null,
+                trailing:
+                    languageProvider.locale?.languageCode == 'kk'
+                        ? const Icon(Icons.check, color: Colors.green)
+                        : null,
                 onTap: () {
                   languageProvider.setLocale('kk');
                   Navigator.pop(context);
@@ -89,9 +92,9 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text.trim(),
       );
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -107,6 +110,29 @@ class _LoginScreenState extends State<LoginScreen> {
             onPressed: _login,
           ),
         ),
+      );
+    }
+  }
+
+  Future<void> _loginAsGuest() async {
+    setState(() {
+      _errorMessage = null;
+    });
+
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.signInAsGuest();
+      if (!mounted) return;
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.toString();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
       );
     }
   }
@@ -208,15 +234,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: authProvider.isLoading ? null : _login,
-                    child: authProvider.isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : Text(localizations.login),
+                    child:
+                        authProvider.isLoading
+                            ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                            : Text(localizations.login),
                   ),
                   const SizedBox(height: 16),
                   TextButton(
@@ -229,6 +254,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                     child: Text('${localizations.signup}'),
                   ),
+                  const SizedBox(height: 16),
+                  OutlinedButton(
+                    onPressed: authProvider.isLoading ? null : _loginAsGuest,
+                    child: Text(
+                      localizations.continueAsGuest ?? 'Continue as Guest',
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -237,4 +269,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-} 
+}
