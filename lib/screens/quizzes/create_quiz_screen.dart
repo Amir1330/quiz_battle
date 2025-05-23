@@ -90,7 +90,9 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
         'timeLimit': int.tryParse(_timeLimitController.text) ?? 0,
       };
 
-      await quizProvider.createQuiz(context, quizData);
+      final quiz = Quiz.fromJson(quizData);
+
+      await quizProvider.createQuiz(quiz);
 
       if (!mounted) return;
 

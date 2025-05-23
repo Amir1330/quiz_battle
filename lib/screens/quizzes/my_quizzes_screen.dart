@@ -45,9 +45,10 @@ class _MyQuizzesScreenState extends State<MyQuizzesScreen>
       } catch (e) {
         debugPrint('Error loading quizzes: $e');
         if (mounted) {
+          final localizations = AppLocalizations.of(context);
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(SnackBar(content: Text('Error loading quizzes: $e')));
+          ).showSnackBar(SnackBar(content: Text('${localizations?.errorLoadingQuiz}: $e')));
         }
       }
     } else {
@@ -70,16 +71,18 @@ class _MyQuizzesScreenState extends State<MyQuizzesScreen>
       } catch (e) {
         debugPrint('Error refreshing quizzes: $e');
         if (mounted) {
+          final localizations = AppLocalizations.of(context);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to refresh quizzes: $e')),
+            SnackBar(content: Text('${localizations?.errorLoadingQuiz}: $e')),
           );
         }
       }
     } else {
       debugPrint('Cannot refresh quizzes - user not authenticated');
       if (mounted) {
+        final localizations = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please log in to view your quizzes')),
+          SnackBar(content: Text(localizations?.loginRequired ?? 'Login required')),
         );
       }
     }
@@ -88,20 +91,21 @@ class _MyQuizzesScreenState extends State<MyQuizzesScreen>
   }
 
   Future<void> _deleteQuiz(Quiz quiz) async {
+    final localizations = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Delete Quiz'),
-            content: const Text('Are you sure you want to delete this quiz?'),
+            title: Text(localizations?.deleteQuiz ?? 'Delete Quiz'),
+            content: Text(localizations?.deleteQuizConfirmation ?? 'Are you sure you want to delete this quiz?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text(localizations?.cancel ?? 'Cancel'),
               ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Delete'),
+                child: Text(localizations?.delete ?? 'Delete'),
               ),
             ],
           ),
@@ -112,10 +116,10 @@ class _MyQuizzesScreenState extends State<MyQuizzesScreen>
         await Provider.of<QuizProvider>(
           context,
           listen: false,
-        ).deleteQuiz(context, quiz.id);
+        ).deleteQuiz(quiz.id, Provider.of<AuthProvider>(context).user!.uid);
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Quiz deleted successfully')),
+          SnackBar(content: Text(localizations?.quizDeletedSuccessfully ?? 'Quiz deleted successfully')),
         );
       } catch (e) {
         if (!mounted) return;
@@ -131,6 +135,16 @@ class _MyQuizzesScreenState extends State<MyQuizzesScreen>
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     final quizProvider = Provider.of<QuizProvider>(context);
     final localizations = AppLocalizations.of(context);
+
+    if (localizations == null) {
+       debugPrint('AppLocalizations context is null in MyQuizzesScreen');
+       return Scaffold( // Return a basic scaffold to prevent crash
+         appBar: AppBar(title: const Text('My Quizzes')),
+         body: const Center(
+           child: Text('Localization not available'),
+         ),
+       );
+    }
 
     if (Provider.of<AuthProvider>(context).isGuest) {
       return Scaffold(
@@ -174,8 +188,8 @@ class _MyQuizzesScreenState extends State<MyQuizzesScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'You haven\'t created any quizzes yet.',
+                    Text(
+                      localizations?.noMyQuizzesAvailable ?? 'No quizzes available yet.',
                       textAlign: TextAlign.center,
                     ),
                     if (quizProvider.error != null)
@@ -193,7 +207,7 @@ class _MyQuizzesScreenState extends State<MyQuizzesScreen>
                       padding: const EdgeInsets.only(top: 16.0),
                       child: ElevatedButton(
                         onPressed: _refreshMyQuizzes,
-                        child: const Text('Retry'),
+                        child: Text(localizations.retry),
                       ),
                     ),
                   ],
@@ -211,7 +225,7 @@ class _MyQuizzesScreenState extends State<MyQuizzesScreen>
                   child: ListTile(
                     title: Text(quiz.title),
                     subtitle: Text(
-                      '${quiz.questions.length} questions • Created ${_formatDate(quiz.createdAt)}',
+                      '${quiz.questions.length} ${localizations.questions} • ${_formatDate(quiz.createdAt)}',
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,

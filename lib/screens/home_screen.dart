@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:quizzz/providers/auth_provider.dart';
 import 'package:quizzz/providers/quiz_provider.dart';
+import 'package:quizzz/providers/connectivity_provider.dart';
 import 'package:quizzz/screens/auth/login_screen.dart';
 import 'package:quizzz/screens/quizzes/create_quiz_screen.dart';
 import 'package:quizzz/screens/quizzes/my_quizzes_screen.dart';
 import 'package:quizzz/screens/quizzes/play_quiz_screen.dart';
 import 'package:quizzz/screens/settings_screen.dart';
 import 'package:quizzz/l10n/app_localizations.dart';
+import 'package:quizzz/widgets/base_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -85,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Get fresh screens to avoid stale data
     final screens = _getScreens();
 
-    return Scaffold(
+    return BaseScreen(
       appBar: AppBar(
         title: Text(localizations.appTitle),
         actions: [
@@ -108,7 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
         ],
       ),
-      body: screens[_selectedIndex],
+      child: screens[_selectedIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: _onItemTapped,
