@@ -14,6 +14,9 @@ import 'package:quizzz/screens/splash_screen.dart';
 import 'package:quizzz/screens/auth/login_screen.dart';
 import 'package:quizzz/l10n/app_localizations.dart';
 import 'package:quizzz/widgets/offline_banner.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'firebase_options.dart';
+import 'services/storage_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -23,11 +26,17 @@ void main() async {
 
   // Initialize Firebase
   try {
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
     debugPrint('Firebase initialized successfully');
   } catch (e) {
     debugPrint('Error initializing Firebase: $e');
   }
+
+  // Инициализация Hive
+  final storageService = StorageService();
+  await storageService.initializeHive();
 
   // Initialize Hive and StorageProvider instance
   late StorageProvider storageProvider;
@@ -42,7 +51,8 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
-        Provider<StorageProvider>(create: (_) => storageProvider), // Provide the instance
+        Provider<StorageProvider>(
+            create: (_) => storageProvider), // Provide the instance
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
@@ -78,7 +88,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final languageProvider = Provider.of<LanguageProvider>(context);
-    
+
     return MaterialApp(
       navigatorKey: navigatorKey,
       title: 'Quizzz',

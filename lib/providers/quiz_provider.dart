@@ -8,18 +8,22 @@ import 'package:uuid/uuid.dart';
 import 'storage_provider.dart';
 import 'connectivity_provider.dart';
 import 'package:quizzz/providers/sync_provider.dart';
+import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/quiz_data.dart';
+import '../services/storage_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class QuizProvider with ChangeNotifier {
-  final DatabaseReference _database =
-      FirebaseDatabase.instanceFor(
-        app: Firebase.app(),
-        databaseURL:
-            'https://quizzz-79fa5-default-rtdb.europe-west1.firebasedatabase.app',
-      ).ref();
+  final DatabaseReference _database = FirebaseDatabase.instanceFor(
+    app: Firebase.app(),
+    databaseURL:
+        'https://quizzz-79fa5-default-rtdb.europe-west1.firebasedatabase.app',
+  ).ref();
   final StorageProvider _storageProvider;
   final ConnectivityProvider _connectivityProvider;
+  final StorageService _storageService = StorageService();
 
   bool _isLoading = false;
   bool _myQuizzesLoading = false;
@@ -30,18 +34,26 @@ class QuizProvider with ChangeNotifier {
   Map<String, dynamic>? _currentQuiz;
   List<QuizHistory> _quizHistory = [];
   bool _isSyncing = false;
+  List<QuizData> _quizzesData = [];
+  bool _isOffline = false;
 
   QuizProvider(this._storageProvider, this._connectivityProvider);
 
-  bool get isLoading => _isLoading || _myQuizzesLoading || _allQuizzesLoading || _isSyncing;
+  bool get isLoading =>
+      _isLoading || _myQuizzesLoading || _allQuizzesLoading || _isSyncing;
   bool get isLoadingMyQuizzes => _myQuizzesLoading;
   bool get isLoadingAllQuizzes => _allQuizzesLoading;
   bool get isSyncing => _isSyncing;
   String? get error => _error;
-  List<Quiz> get quizzes => List.unmodifiable(_quizzes.where((quiz) => quiz.id.isNotEmpty).toList());
-  List<Quiz> get myQuizzes => List.unmodifiable(_myQuizzes.where((quiz) => quiz.id.isNotEmpty).toList());
+  List<Quiz> get quizzes =>
+      List.unmodifiable(_quizzes.where((quiz) => quiz.id.isNotEmpty).toList());
+  List<Quiz> get myQuizzes => List.unmodifiable(
+      _myQuizzes.where((quiz) => quiz.id.isNotEmpty).toList());
   Map<String, dynamic>? get currentQuiz => _currentQuiz;
-  List<QuizHistory> get quizHistory => List.unmodifiable(_quizHistory.where((history) => history.id.isNotEmpty).toList());
+  List<QuizHistory> get quizHistory => List.unmodifiable(
+      _quizHistory.where((history) => history.id.isNotEmpty).toList());
+  List<QuizData> get quizzesData => _quizzesData;
+  bool get isOffline => _isOffline;
 
   void _setError(String message) {
     _error = message;
@@ -66,7 +78,8 @@ class QuizProvider with ChangeNotifier {
         data['creatorId'] is String &&
         data.containsKey('creatorEmail') &&
         data['creatorEmail'] is String &&
-        data.containsKey('questions') && // Just check if it exists, can be empty
+        data.containsKey(
+            'questions') && // Just check if it exists, can be empty
         data.containsKey('timeLimit') &&
         data['timeLimit'] is num;
   }
@@ -153,7 +166,8 @@ class QuizProvider with ChangeNotifier {
         debugPrint('History data missing score');
         return null;
       }
-      if (!data.containsKey('totalQuestions') || data['totalQuestions'] == null) {
+      if (!data.containsKey('totalQuestions') ||
+          data['totalQuestions'] == null) {
         debugPrint('History data missing totalQuestions');
         return null;
       }
@@ -180,7 +194,7 @@ class QuizProvider with ChangeNotifier {
       debugPrint('Firebase quiz data is null');
       return [];
     }
-    
+
     List<Quiz> result = [];
     try {
       if (data is Map) {
@@ -189,14 +203,14 @@ class QuizProvider with ChangeNotifier {
             debugPrint('Firebase quiz value is null for key: $key');
             return; // Skip null values
           }
-          
+
           if (value is Map<String, dynamic>) {
             // Ensure the map has an ID
             if (!value.containsKey('id') || value['id'] == null) {
               debugPrint('Firebase quiz entry missing ID for key: $key');
               return; // Skip entries without ID
             }
-            
+
             final quiz = _parseSingleQuiz(value);
             if (quiz != null) {
               result.add(quiz);
@@ -204,11 +218,13 @@ class QuizProvider with ChangeNotifier {
               debugPrint('Failed to parse Firebase quiz for key: $key');
             }
           } else {
-            debugPrint('Firebase quiz entry is not a map for key: $key, value type: ${value.runtimeType}');
+            debugPrint(
+                'Firebase quiz entry is not a map for key: $key, value type: ${value.runtimeType}');
           }
         });
       } else {
-        debugPrint('Firebase quiz data is not a Map, type: ${data.runtimeType}');
+        debugPrint(
+            'Firebase quiz data is not a Map, type: ${data.runtimeType}');
       }
       return result;
     } catch (e) {
@@ -217,34 +233,37 @@ class QuizProvider with ChangeNotifier {
     }
   }
 
-   // Parses data from Firebase (Map of Maps) into a list of QuizHistory
+  // Parses data from Firebase (Map of Maps) into a list of QuizHistory
   List<QuizHistory> _parseFirebaseHistoryData(dynamic data) {
     if (data == null) return [];
-    
+
     List<QuizHistory> result = [];
     try {
       if (data is Map) {
         data.forEach((key, value) {
-          if (value is Map<String, dynamic>) { // Ensure value is a map before casting
+          if (value is Map<String, dynamic>) {
+            // Ensure value is a map before casting
             final historyEntry = _parseSingleHistory(value);
             if (historyEntry != null) {
               result.add(historyEntry);
             }
           } else {
-             debugPrint('Firebase history entry is not a map: $value');
+            debugPrint('Firebase history entry is not a map: $value');
           }
         });
-      } else if (data is List) { // Handle cases where Firebase returns a List
-         for (final value in data) {
-            if (value is Map<String, dynamic>) { // Ensure value is a map before casting
-               final historyEntry = _parseSingleHistory(value);
-                if (historyEntry != null) {
-                  result.add(historyEntry);
-                }
-            } else {
-               debugPrint('Firebase history entry in list is not a map: $value');
+      } else if (data is List) {
+        // Handle cases where Firebase returns a List
+        for (final value in data) {
+          if (value is Map<String, dynamic>) {
+            // Ensure value is a map before casting
+            final historyEntry = _parseSingleHistory(value);
+            if (historyEntry != null) {
+              result.add(historyEntry);
             }
-         }
+          } else {
+            debugPrint('Firebase history entry in list is not a map: $value');
+          }
+        }
       }
       return result; // Return list of parsed history entries (can be empty)
     } catch (e) {
@@ -253,125 +272,37 @@ class QuizProvider with ChangeNotifier {
     }
   }
 
-
   Future<void> loadQuizzes() async {
-    if (_allQuizzesLoading) return;
+    _isLoading = true;
+    notifyListeners();
 
     try {
-      _allQuizzesLoading = true;
-      _clearError();
-      notifyListeners();
+      final isOnline = await _storageService.isOnline();
+      _isOffline = !isOnline;
 
-      List<Quiz> loadedQuizzes = [];
+      if (isOnline) {
+        // Загрузка данных из Firebase
+        final snapshot =
+            await FirebaseFirestore.instance.collection('quizzes').get();
+        _quizzes = snapshot.docs
+            .map((doc) => QuizData.fromJson({...doc.data(), 'id': doc.id}))
+            .toList();
 
-      // First try to load from Firebase if online
-      final connectivityProvider = Provider.of<ConnectivityProvider>(
-        navigatorKey.currentContext!,
-        listen: false,
-      );
-
-      if (connectivityProvider.isConnected) {
-        try {
-          debugPrint('Attempting to load quizzes from Firebase...');
-          final snapshot = await _database.child('quizzes').get();
-          
-          if (snapshot.exists && snapshot.value != null) {
-            debugPrint('Firebase data received, processing...');
-            final data = snapshot.value;
-            
-            if (data is Map) {
-              debugPrint('Processing ${data.length} quizzes from Firebase');
-              
-              for (final entry in data.entries) {
-                try {
-                  if (entry.value is Map) {
-                    final quizData = Map<String, dynamic>.from(entry.value);
-                    
-                    // Ensure all required fields exist with defaults
-                    quizData['id'] = quizData['id'] ?? entry.key;
-                    quizData['questions'] = quizData['questions'] ?? [];
-                    quizData['timeLimit'] = quizData['timeLimit'] ?? 0;
-                    
-                    // Basic validation
-                    if (quizData['id'] != null && 
-                        quizData['title'] != null && 
-                        quizData['description'] != null && 
-                        quizData['creatorId'] != null) {
-                      
-                      final quiz = Quiz.fromJson(quizData);
-                      if (quiz != null) {
-                        loadedQuizzes.add(quiz);
-                        debugPrint('Successfully loaded quiz: ${quiz.id}');
-                        
-                        // Save to local storage
-                        try {
-                          await _storageProvider.saveQuiz(quizData);
-                          debugPrint('Saved quiz ${quiz.id} to local storage');
-                        } catch (e) {
-                          debugPrint('Error saving quiz to local storage: $e');
-                        }
-                      }
-                    } else {
-                      debugPrint('Skipping invalid quiz data: ${quizData['id']}');
-                    }
-                  }
-                } catch (e) {
-                  debugPrint('Error processing quiz entry: $e');
-                  continue; // Skip this entry and continue with others
-                }
-              }
-            }
-          }
-        } catch (e) {
-          debugPrint('Error loading from Firebase: $e');
-        }
-      }
-
-      // If no quizzes loaded from Firebase, try local storage
-      if (loadedQuizzes.isEmpty) {
-        try {
-          debugPrint('Loading quizzes from local storage...');
-          final localData = await _storageProvider.getQuizzes();
-          
-          if (localData != null) {
-            for (final item in localData) {
-              try {
-                if (item is Map<String, dynamic>) {
-                  final quiz = Quiz.fromJson(item);
-                  if (quiz != null) {
-                    loadedQuizzes.add(quiz);
-                    debugPrint('Loaded quiz from local storage: ${quiz.id}');
-                  }
-                }
-              } catch (e) {
-                debugPrint('Error processing local quiz: $e');
-                continue;
-              }
-            }
-          }
-        } catch (e) {
-          debugPrint('Error loading from local storage: $e');
-        }
-      }
-
-      // Sort and update the quizzes list
-      if (loadedQuizzes.isNotEmpty) {
-        loadedQuizzes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        _quizzes = loadedQuizzes;
-        debugPrint('Successfully loaded ${_quizzes.length} quizzes');
+        // Сохранение данных локально
+        await _storageService.saveQuizData(_quizzes);
       } else {
-        debugPrint('No quizzes loaded from either source');
-        _quizzes = [];
+        // Загрузка данных из локального хранилища
+        _quizzes = await _storageService.getLocalQuizData();
       }
-
     } catch (e) {
-      debugPrint('Critical error in loadQuizzes: $e');
-      _setError('Failed to load quizzes: ${e.toString()}');
-      _quizzes = [];
-    } finally {
-      _allQuizzesLoading = false;
-      notifyListeners();
+      print('Error loading quizzes: $e');
+      // В случае ошибки пытаемся загрузить данные из локального хранилища
+      _quizzes = await _storageService.getLocalQuizData();
+      _isOffline = true;
     }
+
+    _isLoading = false;
+    notifyListeners();
   }
 
   Future<void> loadLocalQuizzes() async {
@@ -384,11 +315,12 @@ class QuizProvider with ChangeNotifier {
 
       debugPrint('Loading quizzes from local storage');
       final localQuizzesData = await _storageProvider.getQuizzes();
-      
+
       final parsedQuizzes = localQuizzesData
-          .map((data) { 
-             if (data is Map<String, dynamic>) { // Ensure data is map before parsing
-               return _parseSingleQuiz(data);
+          .map((data) {
+            if (data is Map<String, dynamic>) {
+              // Ensure data is map before parsing
+              return _parseSingleQuiz(data);
             }
             debugPrint('Local quiz data is not a map: $data');
             return null; // Return null for invalid data format
@@ -402,8 +334,10 @@ class QuizProvider with ChangeNotifier {
       // Sort by newest first
       parsedQuizzes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-       // Filter out any potential nulls or quizzes with empty IDs before assigning to _quizzes
-      _quizzes = parsedQuizzes.where((quiz) => quiz != null && quiz.id.isNotEmpty).toList();
+      // Filter out any potential nulls or quizzes with empty IDs before assigning to _quizzes
+      _quizzes = parsedQuizzes
+          .where((quiz) => quiz != null && quiz.id.isNotEmpty)
+          .toList();
     } catch (e) {
       _error = "Failed to load local quizzes: ${e.toString()}";
       debugPrint(_error);
@@ -432,153 +366,196 @@ class QuizProvider with ChangeNotifier {
       List<Quiz> loadedQuizzes = [];
 
       // Get all local quizzes first
-      debugPrint('loadMyQuizzes: Loading quizzes from local storage for user: $userId');
+      debugPrint(
+          'loadMyQuizzes: Loading quizzes from local storage for user: $userId');
       final localQuizzesData = await _storageProvider.getQuizzes();
-      debugPrint('loadMyQuizzes: Local storage data fetched: ${localQuizzesData?.length ?? 0} items');
+      debugPrint(
+          'loadMyQuizzes: Local storage data fetched: ${localQuizzesData?.length ?? 0} items');
 
       if (localQuizzesData != null) {
         debugPrint('loadMyQuizzes: Processing local storage data');
         // Filter, validate, and parse local quizzes for current user and not deleted
         final localUserQuizzes = localQuizzesData
-            .where((item) => item is Map<String, dynamic>) // Explicitly check if item is a map
-            .map((item) { 
-               final Map<String, dynamic> data = item as Map<String, dynamic>; // Safe cast after where
-               debugPrint('loadMyQuQuizzes: Processing local quiz data entry: ${data['id'] ?? 'No ID'}');
-               // Basic validation before parsing
-               if (data.containsKey('creatorId') && data['creatorId'] == userId) {
-                 try {
-                   final quiz = _parseSingleQuiz(data);
-                   if (quiz == null) {
-                     debugPrint('loadMyQuizzes: Failed to parse local quiz: ${data['id'] ?? 'No ID'}');
-                   }
-                   return quiz;
-                 } catch (e) {
-                   debugPrint('loadMyQuizzes: Error parsing local quiz ${data['id'] ?? 'No ID'}: $e');
-                   return null;
-                 }
-               } else {
-                 debugPrint('loadMyQuizzes: Skipping local quiz entry for wrong user or missing creatorId: ${data['id'] ?? 'No ID'}');
-                 return null;
-               }
-            }) 
-            .where((quiz) => 
+            .where((item) => item
+                is Map<String, dynamic>) // Explicitly check if item is a map
+            .map((item) {
+              final Map<String, dynamic> data =
+                  item as Map<String, dynamic>; // Safe cast after where
+              debugPrint(
+                  'loadMyQuQuizzes: Processing local quiz data entry: ${data['id'] ?? 'No ID'}');
+              // Basic validation before parsing
+              if (data.containsKey('creatorId') &&
+                  data['creatorId'] == userId) {
+                try {
+                  final quiz = _parseSingleQuiz(data);
+                  if (quiz == null) {
+                    debugPrint(
+                        'loadMyQuizzes: Failed to parse local quiz: ${data['id'] ?? 'No ID'}');
+                  }
+                  return quiz;
+                } catch (e) {
+                  debugPrint(
+                      'loadMyQuizzes: Error parsing local quiz ${data['id'] ?? 'No ID'}: $e');
+                  return null;
+                }
+              } else {
+                debugPrint(
+                    'loadMyQuizzes: Skipping local quiz entry for wrong user or missing creatorId: ${data['id'] ?? 'No ID'}');
+                return null;
+              }
+            })
+            .where((quiz) =>
                 quiz != null && // Check if parsing was successful
-                !quiz!.deleted && // Ensure quiz is not marked as deleted (using ! here as quiz is non-null)
+                !quiz!
+                    .deleted && // Ensure quiz is not marked as deleted (using ! here as quiz is non-null)
                 quiz.id.isNotEmpty) // Ensure quiz has a non-empty ID
             .cast<Quiz>() // Safely cast after filtering out nulls
             .toList();
 
-        debugPrint('loadMyQuizzes: Found ${localUserQuizzes.length} valid local quizzes for user $userId');
+        debugPrint(
+            'loadMyQuizzes: Found ${localUserQuizzes.length} valid local quizzes for user $userId');
         loadedQuizzes = localUserQuizzes; // Start with valid local quizzes
-        debugPrint('loadMyQuizzes: Initial loadedQuizzes count: ${loadedQuizzes.length}');
+        debugPrint(
+            'loadMyQuizzes: Initial loadedQuizzes count: ${loadedQuizzes.length}');
       }
 
       if (connectivityProvider.isConnected) {
-        debugPrint('loadMyQuizzes: Connection is online. Loading from Firebase for user: $userId');
+        debugPrint(
+            'loadMyQuizzes: Connection is online. Loading from Firebase for user: $userId');
         try {
           final snapshot = await _database.child('quizzes').get();
-          debugPrint('loadMyQuizzes: Firebase snapshot fetched. Exists: ${snapshot.exists}');
-      if (snapshot.exists && snapshot.value != null) {
+          debugPrint(
+              'loadMyQuizzes: Firebase snapshot fetched. Exists: ${snapshot.exists}');
+          if (snapshot.exists && snapshot.value != null) {
             final allQuizzesData = snapshot.value;
-            debugPrint('loadMyQuizzes: Firebase data type: ${allQuizzesData.runtimeType}');
+            debugPrint(
+                'loadMyQuizzes: Firebase data type: ${allQuizzesData.runtimeType}');
             if (allQuizzesData is Map) {
               debugPrint('loadMyQuizzes: Processing Firebase data map');
               final allFirebaseQuizzes = allQuizzesData.values
-                  .where((value) => value is Map<String, dynamic>) // Ensure value is a map
+                  .where((value) =>
+                      value is Map<String, dynamic>) // Ensure value is a map
                   .map((value) => Map<String, dynamic>.from(value))
                   .toList();
-              debugPrint('loadMyQuizzes: Filtered Firebase entries count: ${allFirebaseQuizzes.length}');
+              debugPrint(
+                  'loadMyQuizzes: Filtered Firebase entries count: ${allFirebaseQuizzes.length}');
 
               // Save all quizzes from Firebase to local storage (this includes others' quizzes, handled by sync)
-              debugPrint('loadMyQuizzes: Saving Firebase quizzes to local storage');
+              debugPrint(
+                  'loadMyQuizzes: Saving Firebase quizzes to local storage');
               for (final quizData in allFirebaseQuizzes) {
                 try {
                   // Mark as synced from Firebase before saving locally
                   quizData['synced'] = true;
                   // Ensure quizData is a valid map before saving
                   if (quizData is Map<String, dynamic>) {
-                     // Only save if it has an ID to avoid saving bad data
-                     if (quizData.containsKey('id') && quizData['id'] != null && (quizData['id'] as String).isNotEmpty) {
-                        await _storageProvider.saveQuiz(quizData);
-                        debugPrint('loadMyQuizzes: Saved Firebase quiz ${quizData['id']} locally');
-                     } else {
-                        debugPrint('loadMyQuizzes: Skipping saving Firebase quiz with missing/empty ID to local storage: $quizData');
-                     }
+                    // Only save if it has an ID to avoid saving bad data
+                    if (quizData.containsKey('id') &&
+                        quizData['id'] != null &&
+                        (quizData['id'] as String).isNotEmpty) {
+                      await _storageProvider.saveQuiz(quizData);
+                      debugPrint(
+                          'loadMyQuizzes: Saved Firebase quiz ${quizData['id']} locally');
+                    } else {
+                      debugPrint(
+                          'loadMyQuizzes: Skipping saving Firebase quiz with missing/empty ID to local storage: $quizData');
+                    }
                   } else {
-                     debugPrint('loadMyQuizzes: Skipping saving non-map Firebase quiz data to local storage: $quizData');
+                    debugPrint(
+                        'loadMyQuizzes: Skipping saving non-map Firebase quiz data to local storage: $quizData');
                   }
                 } catch (e) {
-                  debugPrint('loadMyQuizzes: Error saving Firebase quiz to local storage: $e');
+                  debugPrint(
+                      'loadMyQuizzes: Error saving Firebase quiz to local storage: $e');
                 }
               }
-              debugPrint('loadMyQuizzes: Finished saving Firebase quizzes locally');
+              debugPrint(
+                  'loadMyQuizzes: Finished saving Firebase quizzes locally');
 
               // Filter Firebase quizzes for the current user, validate, and parse
-              debugPrint('loadMyQuizzes: Filtering and parsing remote quizzes for user $userId');
+              debugPrint(
+                  'loadMyQuizzes: Filtering and parsing remote quizzes for user $userId');
               final remoteUserQuizzes = allFirebaseQuizzes
-                  .where((item) => item is Map<String, dynamic>) // Explicitly check if item is a map
+                  .where((item) => item is Map<String,
+                      dynamic>) // Explicitly check if item is a map
                   .map((item) {
-                     final Map<String, dynamic> data = item as Map<String, dynamic>; // Safe cast after where
-                     debugPrint('loadMyQuizzes: Processing remote quiz data entry: ${data['id'] ?? 'No ID'}');
-                     // Basic validation before parsing
-                     if (data.containsKey('creatorId') && data['creatorId'] == userId) {
-                       try {
-                         final quiz = _parseSingleQuiz(data);
-                         if (quiz == null) {
-                           debugPrint('loadMyQuizzes: Failed to parse remote quiz: ${data['id'] ?? 'No ID'}');
-                         }
-                         return quiz;
-                       } catch (e) {
-                         debugPrint('loadMyQuizzes: Error parsing remote quiz ${data['id'] ?? 'No ID'}: $e');
-                         return null;
-                       }
-                     } else {
-                        debugPrint('loadMyQuizzes: Skipping remote quiz entry for wrong user or missing creatorId: ${data['id'] ?? 'No ID'}');
-                       return null;
-                     }
-                   })
-                  .where((quiz) => 
+                    final Map<String, dynamic> data =
+                        item as Map<String, dynamic>; // Safe cast after where
+                    debugPrint(
+                        'loadMyQuizzes: Processing remote quiz data entry: ${data['id'] ?? 'No ID'}');
+                    // Basic validation before parsing
+                    if (data.containsKey('creatorId') &&
+                        data['creatorId'] == userId) {
+                      try {
+                        final quiz = _parseSingleQuiz(data);
+                        if (quiz == null) {
+                          debugPrint(
+                              'loadMyQuizzes: Failed to parse remote quiz: ${data['id'] ?? 'No ID'}');
+                        }
+                        return quiz;
+                      } catch (e) {
+                        debugPrint(
+                            'loadMyQuizzes: Error parsing remote quiz ${data['id'] ?? 'No ID'}: $e');
+                        return null;
+                      }
+                    } else {
+                      debugPrint(
+                          'loadMyQuizzes: Skipping remote quiz entry for wrong user or missing creatorId: ${data['id'] ?? 'No ID'}');
+                      return null;
+                    }
+                  })
+                  .where((quiz) =>
                       quiz != null && // Check for null after parsing
-                      !quiz!.deleted && // Ensure quiz is not marked as deleted (using ! here as quiz is non-null)
+                      !quiz!
+                          .deleted && // Ensure quiz is not marked as deleted (using ! here as quiz is non-null)
                       quiz.id.isNotEmpty) // Ensure quiz has a non-empty ID
                   .cast<Quiz>() // Safely cast after filtering out nulls
                   .toList();
 
-              debugPrint('loadMyQuizzes: Found ${remoteUserQuizzes.length} valid remote quizzes for user $userId in Firebase');
+              debugPrint(
+                  'loadMyQuizzes: Found ${remoteUserQuizzes.length} valid remote quizzes for user $userId in Firebase');
 
               // Merge local and remote quizzes, prioritizing remote if online
               debugPrint('loadMyQuizzes: Merging local and remote quizzes');
               final Map<String, Quiz> mergedQuizzes = {};
-                
+
               // Add local quizzes first
               for (final quiz in loadedQuizzes) {
                 // Already validated to have non-empty ID
-                debugPrint('loadMyQuizzes: Adding local quiz to merge map: ${quiz.id}');
+                debugPrint(
+                    'loadMyQuizzes: Adding local quiz to merge map: ${quiz.id}');
                 mergedQuizzes[quiz.id] = quiz;
               }
-              
+
               // Add remote quizzes (overwriting local if same ID)
               for (final quiz in remoteUserQuizzes) {
-                 // Already validated to have non-empty ID
-                 debugPrint('loadMyQuizzes: Adding remote quiz to merge map: ${quiz.id}');
-                 mergedQuizzes[quiz.id] = quiz;
+                // Already validated to have non-empty ID
+                debugPrint(
+                    'loadMyQuizzes: Adding remote quiz to merge map: ${quiz.id}');
+                mergedQuizzes[quiz.id] = quiz;
               }
-              
+
               loadedQuizzes = mergedQuizzes.values.toList();
-              debugPrint('loadMyQuizzes: Merged quizzes count: ${loadedQuizzes.length}');
-      } else {
-               debugPrint('loadMyQuizzes: Firebase quizzes data is not in expected Map format for loadMyQuizzes: ${allQuizzesData.runtimeType}');
+              debugPrint(
+                  'loadMyQuizzes: Merged quizzes count: ${loadedQuizzes.length}');
+            } else {
+              debugPrint(
+                  'loadMyQuizzes: Firebase quizzes data is not in expected Map format for loadMyQuizzes: ${allQuizzesData.runtimeType}');
             }
           } else {
-            debugPrint('loadMyQuizzes: No quizzes found in Firebase for user $userId');
-      }
-    } catch (e) {
-          debugPrint('loadMyQuizzes: Error loading my quizzes from Firebase: $e');
+            debugPrint(
+                'loadMyQuizzes: No quizzes found in Firebase for user $userId');
+          }
+        } catch (e) {
+          debugPrint(
+              'loadMyQuizzes: Error loading my quizzes from Firebase: $e');
           // Continue with valid local quizzes if Firebase load fails
-          debugPrint('loadMyQuizzes: Firebase load failed, using ${loadedQuizzes.length} local quizzes instead');
+          debugPrint(
+              'loadMyQuizzes: Firebase load failed, using ${loadedQuizzes.length} local quizzes instead');
         }
       } else {
-        debugPrint('loadMyQuizzes: Offline: Loading only valid local quizzes for user: $userId. Count: ${loadedQuizzes.length}');
+        debugPrint(
+            'loadMyQuizzes: Offline: Loading only valid local quizzes for user: $userId. Count: ${loadedQuizzes.length}');
       }
 
       debugPrint('loadMyQuizzes: Sorting loaded quizzes');
@@ -586,7 +563,6 @@ class QuizProvider with ChangeNotifier {
       // Assign the list of valid, merged quizzes
       _myQuizzes = loadedQuizzes; // Already filtered and validated above
       debugPrint('loadMyQuizzes: Final _myQuizzes count: ${_myQuizzes.length}');
-      
     } catch (e) {
       // Catch any remaining errors during the process
       debugPrint('loadMyQuizzes: Top-level error caught: $e');
@@ -602,7 +578,7 @@ class QuizProvider with ChangeNotifier {
     _isLoading = true;
     _clearError();
     notifyListeners();
-    
+
     final connectivityProvider = Provider.of<ConnectivityProvider>(
       navigatorKey.currentContext!,
       listen: false,
@@ -619,7 +595,6 @@ class QuizProvider with ChangeNotifier {
         // Save to local storage after successful Firebase write
         await _storageProvider.saveQuiz(quizData);
         debugPrint('Quiz created successfully in Firebase and saved locally');
-
       } else {
         debugPrint('Offline: Saving quiz locally: ${quiz.id}');
         // Mark as not synced for later upload
@@ -636,15 +611,15 @@ class QuizProvider with ChangeNotifier {
 
       // Add the new quiz to the local lists immediately (after ensuring it's a valid quiz)
       if (quiz.id.isNotEmpty) {
-         _quizzes.add(quiz);
-         _myQuizzes.add(quiz);
-         _quizzes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-         _myQuizzes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-         notifyListeners();
+        _quizzes.add(quiz);
+        _myQuizzes.add(quiz);
+        _quizzes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _myQuizzes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        notifyListeners();
       } else {
-         debugPrint('Created quiz has empty ID, not adding to local lists: ${quiz.title}');
+        debugPrint(
+            'Created quiz has empty ID, not adding to local lists: ${quiz.title}');
       }
-
     } catch (e) {
       _setError('Failed to create quiz: ${e.toString()}');
     } finally {
@@ -654,9 +629,9 @@ class QuizProvider with ChangeNotifier {
   }
 
   Future<void> deleteQuiz(String quizId, String userId) async {
-      _isLoading = true;
+    _isLoading = true;
     _clearError();
-      notifyListeners();
+    notifyListeners();
 
     final connectivityProvider = Provider.of<ConnectivityProvider>(
       navigatorKey.currentContext!,
@@ -666,18 +641,25 @@ class QuizProvider with ChangeNotifier {
     try {
       // Mark as deleted locally first
       final localQuizzesData = await _storageProvider.getQuizzes();
-      final quizToDeleteDataIndex = localQuizzesData.indexWhere(
-        (quiz) => quiz is Map<String, dynamic> && quiz['id'] == quizId && quiz['creatorId'] == userId
-      );
+      final quizToDeleteDataIndex = localQuizzesData.indexWhere((quiz) =>
+          quiz is Map<String, dynamic> &&
+          quiz['id'] == quizId &&
+          quiz['creatorId'] == userId);
 
       Map<String, dynamic> quizToDeleteData;
 
       if (quizToDeleteDataIndex != -1) {
         // Create a mutable map copy
-        quizToDeleteData = Map<String, dynamic>.from(localQuizzesData[quizToDeleteDataIndex]);
+        quizToDeleteData =
+            Map<String, dynamic>.from(localQuizzesData[quizToDeleteDataIndex]);
       } else {
-         // If not found locally, create a minimal record to mark for deletion during sync
-         quizToDeleteData = { 'id': quizId, 'creatorId': userId, 'deleted': true, 'synced': false };
+        // If not found locally, create a minimal record to mark for deletion during sync
+        quizToDeleteData = {
+          'id': quizId,
+          'creatorId': userId,
+          'deleted': true,
+          'synced': false
+        };
       }
 
       // Ensure 'deleted' is true and 'synced' is false for sync
@@ -711,7 +693,6 @@ class QuizProvider with ChangeNotifier {
           // SyncProvider will handle retries
         });
       }
-
     } catch (e) {
       _setError('Failed to delete quiz: ${e.toString()}');
     } finally {
@@ -737,17 +718,20 @@ class QuizProvider with ChangeNotifier {
       debugPrint('Loading history from local storage for user: $userId');
       final localHistoryData = await _storageProvider.getHistory();
       loadedHistory = localHistoryData
-          .map((data) { 
-            if (data is Map<String, dynamic>) { // Ensure data is map before parsing
-               return _parseSingleHistory(data);
+          .map((data) {
+            if (data is Map<String, dynamic>) {
+              // Ensure data is map before parsing
+              return _parseSingleHistory(data);
             }
             debugPrint('Local history data is not a map: $data');
             return null; // Return null for invalid data format
           })
-          .where((history) => history != null) // Filter out null results from parsing
+          .where((history) =>
+              history != null) // Filter out null results from parsing
           .cast<QuizHistory>()
           .toList();
-      debugPrint('Loaded ${loadedHistory.length} history entries from local storage');
+      debugPrint(
+          'Loaded ${loadedHistory.length} history entries from local storage');
 
       if (connectivityProvider.isConnected) {
         debugPrint('Loading quiz history from Firebase for user: $userId');
@@ -757,45 +741,52 @@ class QuizProvider with ChangeNotifier {
             final historyData = snapshot.value;
             if (historyData is Map) {
               final remoteHistoryEntries = historyData.values
-                  .where((value) => value is Map<String, dynamic>) // Ensure value is a map
+                  .where((value) =>
+                      value is Map<String, dynamic>) // Ensure value is a map
                   .map((value) => Map<String, dynamic>.from(value))
-                   .map((data) { 
-                      if (data is Map<String, dynamic>) { // Ensure data is map before parsing
-                         return _parseSingleHistory(data);
-                      }
-                       debugPrint('Remote history data is not a map: $data');
-                       return null; // Return null for invalid data format
-                   })
-                  .where((history) => history != null) // Filter out null results from parsing
+                  .map((data) {
+                    if (data is Map<String, dynamic>) {
+                      // Ensure data is map before parsing
+                      return _parseSingleHistory(data);
+                    }
+                    debugPrint('Remote history data is not a map: $data');
+                    return null; // Return null for invalid data format
+                  })
+                  .where((history) =>
+                      history != null) // Filter out null results from parsing
                   .cast<QuizHistory>()
                   .toList();
 
               // Merge local and remote history, prioritizing remote
               final Map<String, QuizHistory> mergedHistory = {};
-                
-              for (final entry in loadedHistory) {
-                 if (entry.id.isNotEmpty) { // Ensure entry has a valid ID before merging
-                    mergedHistory[entry.id] = entry;
-                 } else {
-                     debugPrint('Skipping local history entry with empty ID during merge');
-                 }
-              }
-              
-              for (final entry in remoteHistoryEntries) {
-                 if (entry.id.isNotEmpty) { // Ensure entry has a valid ID before merging
-                    mergedHistory[entry.id] = entry;
-                     // Save remote history entries to local storage, marking them as synced
-                    final dataToSave = entry.toJson();
-                    dataToSave['synced'] = true;
-                    await _storageProvider.saveHistory(dataToSave);
-                 } else {
-                     debugPrint('Skipping remote history entry with empty ID during merge');
-                 }
-              }
-              
-              loadedHistory = mergedHistory.values.toList();
-               debugPrint('Loaded and merged ${loadedHistory.length} history entries from Firebase and local storage');
 
+              for (final entry in loadedHistory) {
+                if (entry.id.isNotEmpty) {
+                  // Ensure entry has a valid ID before merging
+                  mergedHistory[entry.id] = entry;
+                } else {
+                  debugPrint(
+                      'Skipping local history entry with empty ID during merge');
+                }
+              }
+
+              for (final entry in remoteHistoryEntries) {
+                if (entry.id.isNotEmpty) {
+                  // Ensure entry has a valid ID before merging
+                  mergedHistory[entry.id] = entry;
+                  // Save remote history entries to local storage, marking them as synced
+                  final dataToSave = entry.toJson();
+                  dataToSave['synced'] = true;
+                  await _storageProvider.saveHistory(dataToSave);
+                } else {
+                  debugPrint(
+                      'Skipping remote history entry with empty ID during merge');
+                }
+              }
+
+              loadedHistory = mergedHistory.values.toList();
+              debugPrint(
+                  'Loaded and merged ${loadedHistory.length} history entries from Firebase and local storage');
             } else {
               debugPrint('Firebase history data is not in expected Map format');
             }
@@ -805,16 +796,18 @@ class QuizProvider with ChangeNotifier {
         } catch (e) {
           debugPrint('Error loading quiz history from Firebase: $e');
           // Continue with local history if Firebase load fails
-           debugPrint('Firebase load failed, using ${loadedHistory.length} local history entries instead');
+          debugPrint(
+              'Firebase load failed, using ${loadedHistory.length} local history entries instead');
         }
       } else {
-        debugPrint('Offline: Loading only local quiz history for user: $userId');
+        debugPrint(
+            'Offline: Loading only local quiz history for user: $userId');
       }
 
       loadedHistory.sort((a, b) => b.completedAt.compareTo(a.completedAt));
-       // Filter out any potential nulls or history entries with empty IDs before assigning to _quizHistory
-      _quizHistory = loadedHistory.where((history) => history.id.isNotEmpty).toList();
-
+      // Filter out any potential nulls or history entries with empty IDs before assigning to _quizHistory
+      _quizHistory =
+          loadedHistory.where((history) => history.id.isNotEmpty).toList();
     } catch (e) {
       _setError('Failed to load quiz history: ${e.toString()}');
     } finally {
@@ -824,7 +817,7 @@ class QuizProvider with ChangeNotifier {
   }
 
   Future<void> saveQuizResult(QuizHistory result, String userId) async {
-     _isLoading = true;
+    _isLoading = true;
     _clearError();
     notifyListeners();
 
@@ -834,48 +827,55 @@ class QuizProvider with ChangeNotifier {
     );
 
     try {
-       // Save to local storage first
+      // Save to local storage first
       final historyData = result.toJson();
       historyData['synced'] = false; // Mark as not synced initially
       await _storageProvider.saveHistory(historyData);
-       debugPrint('Quiz result saved locally: ${result.id}');
+      debugPrint('Quiz result saved locally: ${result.id}');
 
       // Add to local history list immediately (after ensuring it's a valid history entry)
       if (result.id.isNotEmpty && result.userId.isNotEmpty) {
-         _quizHistory.add(result);
-         _quizHistory.sort((a, b) => b.completedAt.compareTo(a.completedAt));
-         notifyListeners(); // Notify to update UI
+        _quizHistory.add(result);
+        _quizHistory.sort((a, b) => b.completedAt.compareTo(a.completedAt));
+        notifyListeners(); // Notify to update UI
       } else {
-         debugPrint('Saved history entry has empty ID or UserId, not adding to local list: ${result.id}, ${result.userId}');
+        debugPrint(
+            'Saved history entry has empty ID or UserId, not adding to local list: ${result.id}, ${result.userId}');
       }
 
       // Add to pending changes for sync
       final syncProvider = Provider.of<SyncProvider>(
-          navigatorKey.currentContext!,
-          listen: false,
-        );
-      await syncProvider.addPendingChange('history/$userId/${result.id}', historyData);
+        navigatorKey.currentContext!,
+        listen: false,
+      );
+      await syncProvider.addPendingChange(
+          'history/$userId/${result.id}', historyData);
       debugPrint('Quiz result added to sync queue: ${result.id}');
-
 
       // If online, attempt immediate Firebase save (fire-and-forget)
       if (connectivityProvider.isConnected) {
-        debugPrint('Attempting immediate Firebase save for quiz result: ${result.id}');
-         // Mark as synced before sending to Firebase
+        debugPrint(
+            'Attempting immediate Firebase save for quiz result: ${result.id}');
+        // Mark as synced before sending to Firebase
         historyData['synced'] = true;
-         _database.child('history').child(userId).child(result.id).set(historyData).then((_) {
+        _database
+            .child('history')
+            .child(userId)
+            .child(result.id)
+            .set(historyData)
+            .then((_) {
           debugPrint('Quiz result saved to Firebase: ${result.id}');
           // No need to update local storage here, sync will handle it
         }).catchError((e) {
-          debugPrint('Error saving quiz result to Firebase: $e. Will sync later.');
+          debugPrint(
+              'Error saving quiz result to Firebase: $e. Will sync later.');
           // SyncProvider will handle retries
         });
       }
-
     } catch (e) {
       _setError('Error saving quiz results: ${e.toString()}');
     } finally {
-       _isLoading = false;
+      _isLoading = false;
       // notifyListeners(); // Already notified when adding to local history list if entry was added
     }
   }
@@ -901,12 +901,14 @@ class QuizProvider with ChangeNotifier {
     try {
       final localQuizzesData = await _storageProvider.getQuizzes();
       final unsyncedQuizzes = localQuizzesData
-          .where((quiz) => 
-              quiz is Map<String, dynamic> && // Ensure it's a map
-              !(quiz['synced'] ?? true) && 
-              _isValidQuizData(quiz) &&
-              (quiz['id'] is String && (quiz['id'] as String).isNotEmpty) // Ensure it has a valid ID
-           )
+          .where((quiz) =>
+                  quiz is Map<String, dynamic> && // Ensure it's a map
+                  !(quiz['synced'] ?? true) &&
+                  _isValidQuizData(quiz) &&
+                  (quiz['id'] is String &&
+                      (quiz['id'] as String)
+                          .isNotEmpty) // Ensure it has a valid ID
+              )
           .toList();
 
       debugPrint('Found ${unsyncedQuizzes.length} unsynced local quizzes');
@@ -914,44 +916,43 @@ class QuizProvider with ChangeNotifier {
       for (final quizData in unsyncedQuizzes) {
         // Ensure quizData is map before processing
         if (quizData is Map<String, dynamic>) {
-           final quizId = quizData['id'] as String?;
-            if (quizId != null && quizId.isNotEmpty) {
-              try {
-                if (quizData['deleted'] ?? false) {
-                  // If marked for deletion, remove from Firebase
-                  await _database.child('quizzes').child(quizId).remove();
-                  debugPrint('Deleted quiz $quizId from Firebase during sync');
-                  // Remove from local storage after successful Firebase deletion
-                  await _storageProvider.deleteQuiz(quizId);
-                   debugPrint('Deleted quiz $quizId from local storage after sync');
-
-                } else {
-                  // Otherwise, save/update in Firebase
-                  // Ensure the synced flag is true before sending
-                  quizData['synced'] = true;
-                  await _database.child('quizzes').child(quizId).set(quizData);
-                  debugPrint('Synced quiz $quizId to Firebase');
-                  // Update local storage to mark as synced
-                  await _storageProvider.saveQuiz(quizData);
-                   debugPrint('Updated local storage for quiz $quizId after sync');
-                }
-        } catch (e) {
-                debugPrint('Error syncing quiz $quizId: $e. Will retry later.');
-                // If Firebase operation fails, keep unsynced flag as false to retry
-                quizData['synced'] = false;
+          final quizId = quizData['id'] as String?;
+          if (quizId != null && quizId.isNotEmpty) {
+            try {
+              if (quizData['deleted'] ?? false) {
+                // If marked for deletion, remove from Firebase
+                await _database.child('quizzes').child(quizId).remove();
+                debugPrint('Deleted quiz $quizId from Firebase during sync');
+                // Remove from local storage after successful Firebase deletion
+                await _storageProvider.deleteQuiz(quizId);
+                debugPrint(
+                    'Deleted quiz $quizId from local storage after sync');
+              } else {
+                // Otherwise, save/update in Firebase
+                // Ensure the synced flag is true before sending
+                quizData['synced'] = true;
+                await _database.child('quizzes').child(quizId).set(quizData);
+                debugPrint('Synced quiz $quizId to Firebase');
+                // Update local storage to mark as synced
                 await _storageProvider.saveQuiz(quizData);
-                 debugPrint('Marked quiz $quizId for retry after sync error');
+                debugPrint('Updated local storage for quiz $quizId after sync');
               }
-            } else {
-               debugPrint('Unsynced quiz data missing ID: $quizData');
+            } catch (e) {
+              debugPrint('Error syncing quiz $quizId: $e. Will retry later.');
+              // If Firebase operation fails, keep unsynced flag as false to retry
+              quizData['synced'] = false;
+              await _storageProvider.saveQuiz(quizData);
+              debugPrint('Marked quiz $quizId for retry after sync error');
             }
+          } else {
+            debugPrint('Unsynced quiz data missing ID: $quizData');
+          }
         } else {
-           debugPrint('Unsynced quiz data is not a map: $quizData');
+          debugPrint('Unsynced quiz data is not a map: $quizData');
         }
       }
 
       debugPrint('Sync of unsynced local quizzes completed');
-
     } catch (e) {
       debugPrint('Error during syncUnsyncedQuizzes: $e');
     } finally {
@@ -960,8 +961,8 @@ class QuizProvider with ChangeNotifier {
     }
   }
 
-   Future<void> syncUnsyncedHistory() async {
-     if (_isSyncing) return; // Avoid concurrent syncs
+  Future<void> syncUnsyncedHistory() async {
+    if (_isSyncing) return; // Avoid concurrent syncs
 
     final connectivityProvider = Provider.of<ConnectivityProvider>(
       navigatorKey.currentContext!,
@@ -974,59 +975,75 @@ class QuizProvider with ChangeNotifier {
     }
 
     _isSyncing = true;
-      notifyListeners();
+    notifyListeners();
     debugPrint('Starting sync of unsynced local history');
 
     try {
       final localHistoryData = await _storageProvider.getHistory();
-       // Filter for unsynced entries. Assume history entries are not deleted via sync.
+      // Filter for unsynced entries. Assume history entries are not deleted via sync.
       final unsyncedHistory = localHistoryData
-          .where((entry) => 
-              entry is Map<String, dynamic> && // Ensure it's a map
-              !(entry['synced'] ?? true) && 
-              _isValidHistoryData(entry) &&
-              (entry['id'] is String && (entry['id'] as String).isNotEmpty) && // Ensure it has a valid ID
-              (entry['userId'] is String && (entry['userId'] as String).isNotEmpty) // Ensure it has a valid User ID
-          )
+          .where((entry) =>
+                  entry is Map<String, dynamic> && // Ensure it's a map
+                  !(entry['synced'] ?? true) &&
+                  _isValidHistoryData(entry) &&
+                  (entry['id'] is String &&
+                      (entry['id'] as String)
+                          .isNotEmpty) && // Ensure it has a valid ID
+                  (entry['userId'] is String &&
+                      (entry['userId'] as String)
+                          .isNotEmpty) // Ensure it has a valid User ID
+              )
           .toList();
 
-       debugPrint('Found ${unsyncedHistory.length} unsynced local history entries');
+      debugPrint(
+          'Found ${unsyncedHistory.length} unsynced local history entries');
 
-       for (final entryData in unsyncedHistory) {
-         // Ensure entryData is map before processing
-         if (entryData is Map<String, dynamic>) {
-            final entryId = entryData['id'] as String?;
-            final userId = entryData['userId'] as String?; // Assuming userId is part of history data
+      for (final entryData in unsyncedHistory) {
+        // Ensure entryData is map before processing
+        if (entryData is Map<String, dynamic>) {
+          final entryId = entryData['id'] as String?;
+          final userId = entryData['userId']
+              as String?; // Assuming userId is part of history data
 
-             if (entryId != null && entryId.isNotEmpty && userId != null && userId.isNotEmpty) {
-                try {
-                   // Save/update in Firebase
-                  // Ensure the synced flag is true before sending
-                  entryData['synced'] = true;
-                  await _database.child('history').child(userId).child(entryId).set(entryData);
-                  debugPrint('Synced history entry $entryId to Firebase for user $userId');
-                  // Update local storage to mark as synced
-                  await _storageProvider.saveHistory(entryData);
-                  debugPrint('Updated local storage for history entry $entryId after sync');
-
-    } catch (e) {
-                  debugPrint('Error syncing history entry $entryId: $e. Will retry later.');
-                  // If Firebase operation fails, keep unsynced flag as false to retry
-                  entryData['synced'] = false;
-                  await _storageProvider.saveHistory(entryData);
-                   debugPrint('Marked history entry $entryId for retry after sync error');
-                }
-             } else {
-                debugPrint('Unsynced history data missing ID or UserId: $entryData');
-             }
-         } else {
-            debugPrint('Unsynced history data is not a map: $entryData');
-         }
+          if (entryId != null &&
+              entryId.isNotEmpty &&
+              userId != null &&
+              userId.isNotEmpty) {
+            try {
+              // Save/update in Firebase
+              // Ensure the synced flag is true before sending
+              entryData['synced'] = true;
+              await _database
+                  .child('history')
+                  .child(userId)
+                  .child(entryId)
+                  .set(entryData);
+              debugPrint(
+                  'Synced history entry $entryId to Firebase for user $userId');
+              // Update local storage to mark as synced
+              await _storageProvider.saveHistory(entryData);
+              debugPrint(
+                  'Updated local storage for history entry $entryId after sync');
+            } catch (e) {
+              debugPrint(
+                  'Error syncing history entry $entryId: $e. Will retry later.');
+              // If Firebase operation fails, keep unsynced flag as false to retry
+              entryData['synced'] = false;
+              await _storageProvider.saveHistory(entryData);
+              debugPrint(
+                  'Marked history entry $entryId for retry after sync error');
+            }
+          } else {
+            debugPrint(
+                'Unsynced history data missing ID or UserId: $entryData');
+          }
+        } else {
+          debugPrint('Unsynced history data is not a map: $entryData');
+        }
       }
-       debugPrint('Sync of unsynced local history completed');
-
+      debugPrint('Sync of unsynced local history completed');
     } catch (e) {
-       debugPrint('Error during syncUnsyncedHistory: $e');
+      debugPrint('Error during syncUnsyncedHistory: $e');
     } finally {
       _isSyncing = false;
       notifyListeners();
@@ -1062,16 +1079,17 @@ class QuizProvider with ChangeNotifier {
         if (data is Map<String, dynamic> && data['id'] == quizId) {
           final quiz = _parseSingleQuiz(data);
           if (quiz != null) {
-             debugPrint('Found quiz $quizId in local storage and parsed successfully');
-             return quiz;
+            debugPrint(
+                'Found quiz $quizId in local storage and parsed successfully');
+            return quiz;
           } else {
             debugPrint('Failed to parse local quiz data for ID $quizId: $data');
           }
         }
       }
     } catch (e) {
-       debugPrint('Error fetching from local storage: $e');
-       // Continue even if local storage fetch fails
+      debugPrint('Error fetching from local storage: $e');
+      // Continue even if local storage fetch fails
     }
 
     final connectivityProvider = Provider.of<ConnectivityProvider>(
@@ -1086,22 +1104,25 @@ class QuizProvider with ChangeNotifier {
         final snapshot = await _database.child('quizzes').child(quizId).get();
         if (snapshot.exists && snapshot.value != null) {
           final dynamicValue = snapshot.value;
-           if (dynamicValue is Map<String, dynamic>) { // Ensure value is a map
-             final quiz = _parseSingleQuiz(dynamicValue);
-             if (quiz != null) {
-               debugPrint('Found and parsed quiz $quizId from Firebase');
-               // Save to local storage after fetching from Firebase
-               final dataToSave = quiz.toJson();
-               dataToSave['synced'] = true; // Mark as synced
-               await _storageProvider.saveQuiz(dataToSave);
-               debugPrint('Saved fetched quiz $quizId to local storage');
-               return quiz;
-             } else {
-               debugPrint('Firebase quiz data found for ID $quizId is invalid or could not be parsed');
-             }
-           } else {
-             debugPrint('Firebase quiz data found for ID $quizId is not a map: $dynamicValue');
-           }
+          if (dynamicValue is Map<String, dynamic>) {
+            // Ensure value is a map
+            final quiz = _parseSingleQuiz(dynamicValue);
+            if (quiz != null) {
+              debugPrint('Found and parsed quiz $quizId from Firebase');
+              // Save to local storage after fetching from Firebase
+              final dataToSave = quiz.toJson();
+              dataToSave['synced'] = true; // Mark as synced
+              await _storageProvider.saveQuiz(dataToSave);
+              debugPrint('Saved fetched quiz $quizId to local storage');
+              return quiz;
+            } else {
+              debugPrint(
+                  'Firebase quiz data found for ID $quizId is invalid or could not be parsed');
+            }
+          } else {
+            debugPrint(
+                'Firebase quiz data found for ID $quizId is not a map: $dynamicValue');
+          }
         }
       } catch (e) {
         debugPrint('Error fetching quiz $quizId from Firebase: $e');
@@ -1114,9 +1135,10 @@ class QuizProvider with ChangeNotifier {
   }
 
   // Method to fetch a single quiz history entry by ID
-  Future<QuizHistory?> getQuizHistoryEntryById(String entryId, String userId) async {
-     // Try fetching from the currently loaded history first
-     try {
+  Future<QuizHistory?> getQuizHistoryEntryById(
+      String entryId, String userId) async {
+    // Try fetching from the currently loaded history first
+    try {
       for (final entry in _quizHistory) {
         if (entry.id == entryId && entry.userId == userId) {
           debugPrint('Found history entry $entryId in loaded history');
@@ -1124,27 +1146,31 @@ class QuizProvider with ChangeNotifier {
         }
       }
     } catch (e) {
-       debugPrint('Error searching loaded history: $e');
-        // Continue even if searching loaded history fails
+      debugPrint('Error searching loaded history: $e');
+      // Continue even if searching loaded history fails
     }
 
     // Try fetching from local storage
     try {
       final localHistoryData = await _storageProvider.getHistory();
       for (final dynamic data in localHistoryData) {
-        if (data is Map<String, dynamic> && data['id'] == entryId && data['userId'] == userId) {
+        if (data is Map<String, dynamic> &&
+            data['id'] == entryId &&
+            data['userId'] == userId) {
           final entry = _parseSingleHistory(data);
           if (entry != null) {
-             debugPrint('Found history entry $entryId in local storage and parsed successfully');
-             return entry;
+            debugPrint(
+                'Found history entry $entryId in local storage and parsed successfully');
+            return entry;
           } else {
-            debugPrint('Failed to parse local history data for ID $entryId: $data');
+            debugPrint(
+                'Failed to parse local history data for ID $entryId: $data');
           }
         }
       }
     } catch (e) {
-       debugPrint('Error fetching from local history: $e');
-        // Continue even if local storage fetch fails
+      debugPrint('Error fetching from local history: $e');
+      // Continue even if local storage fetch fails
     }
 
     final connectivityProvider = Provider.of<ConnectivityProvider>(
@@ -1155,34 +1181,42 @@ class QuizProvider with ChangeNotifier {
     // Try fetching from Firebase if connected
     if (connectivityProvider.isConnected) {
       try {
-        debugPrint('Fetching history entry $entryId from Firebase for user $userId');
-        final snapshot = await _database.child('history').child(userId).child(entryId).get();
+        debugPrint(
+            'Fetching history entry $entryId from Firebase for user $userId');
+        final snapshot =
+            await _database.child('history').child(userId).child(entryId).get();
         if (snapshot.exists && snapshot.value != null) {
           final dynamicValue = snapshot.value;
-           if (dynamicValue is Map<String, dynamic>) { // Ensure value is a map
-             final entry = _parseSingleHistory(dynamicValue);
-             if (entry != null) {
-                debugPrint('Found and parsed history entry $entryId from Firebase');
-                // Save to local storage after fetching from Firebase
-               final dataToSave = entry.toJson();
-               dataToSave['synced'] = true; // Mark as synced
-               await _storageProvider.saveHistory(dataToSave);
-                debugPrint('Saved fetched history entry $entryId to local storage');
-               return entry;
-             } else {
-                debugPrint('Firebase history data found for ID $entryId is invalid or could not be parsed');
-             }
-           } else {
-             debugPrint('Firebase history data found for ID $entryId is not a map: $dynamicValue');
-           }
+          if (dynamicValue is Map<String, dynamic>) {
+            // Ensure value is a map
+            final entry = _parseSingleHistory(dynamicValue);
+            if (entry != null) {
+              debugPrint(
+                  'Found and parsed history entry $entryId from Firebase');
+              // Save to local storage after fetching from Firebase
+              final dataToSave = entry.toJson();
+              dataToSave['synced'] = true; // Mark as synced
+              await _storageProvider.saveHistory(dataToSave);
+              debugPrint(
+                  'Saved fetched history entry $entryId to local storage');
+              return entry;
+            } else {
+              debugPrint(
+                  'Firebase history data found for ID $entryId is invalid or could not be parsed');
+            }
+          } else {
+            debugPrint(
+                'Firebase history data found for ID $entryId is not a map: $dynamicValue');
+          }
         }
       } catch (e) {
-        debugPrint('Error fetching history entry $entryId from Firebase for user $userId: $e');
+        debugPrint(
+            'Error fetching history entry $entryId from Firebase for user $userId: $e');
       }
     }
 
     // Entry not found anywhere
-     debugPrint('History entry $entryId not found locally or remotely');
+    debugPrint('History entry $entryId not found locally or remotely');
     return null;
   }
 
@@ -1193,19 +1227,20 @@ class QuizProvider with ChangeNotifier {
       for (final dynamic data in localQuizzesData) {
         if (data is Map<String, dynamic> && data['id'] == quizId) {
           final quiz = _parseSingleQuiz(data);
-           if (quiz != null) {
-              debugPrint('Found quiz $quizId in local storage and parsed successfully');
-              return quiz;
-           } else {
-              debugPrint('Failed to parse local quiz data for ID $quizId: $data');
-           }
+          if (quiz != null) {
+            debugPrint(
+                'Found quiz $quizId in local storage and parsed successfully');
+            return quiz;
+          } else {
+            debugPrint('Failed to parse local quiz data for ID $quizId: $data');
+          }
         }
       }
     } catch (e) {
       debugPrint('Error fetching quiz by ID locally: $e');
     }
-     // Quiz not found locally
-     debugPrint('Quiz $quizId not found locally');
+    // Quiz not found locally
+    debugPrint('Quiz $quizId not found locally');
     return null; // Quiz not found locally or invalid data
   }
 
@@ -1217,15 +1252,17 @@ class QuizProvider with ChangeNotifier {
         if (data is Map<String, dynamic> && data['id'] == historyId) {
           final entry = _parseSingleHistory(data);
           if (entry != null) {
-             debugPrint('Found history entry $historyId in local storage and parsed successfully');
-             return entry;
+            debugPrint(
+                'Found history entry $historyId in local storage and parsed successfully');
+            return entry;
           } else {
-             debugPrint('Failed to parse local history data for ID $historyId: $data');
+            debugPrint(
+                'Failed to parse local history data for ID $historyId: $data');
           }
         }
       }
     } catch (e) {
-       debugPrint('Error fetching history entry by ID locally: $e');
+      debugPrint('Error fetching history entry by ID locally: $e');
     }
     // History entry not found locally
     debugPrint('History entry $historyId not found locally');
@@ -1236,7 +1273,7 @@ class QuizProvider with ChangeNotifier {
   Future<void> updateQuiz(Quiz updatedQuiz) async {
     _isLoading = true;
     _clearError();
-      notifyListeners();
+    notifyListeners();
 
     final connectivityProvider = Provider.of<ConnectivityProvider>(
       navigatorKey.currentContext!,
@@ -1265,15 +1302,22 @@ class QuizProvider with ChangeNotifier {
         navigatorKey.currentContext!,
         listen: false,
       );
-      await syncProvider.addPendingChange('quizzes/${updatedQuiz.id}', quizData);
-      debugPrint('Update action added to sync queue for quiz: ${updatedQuiz.id}');
+      await syncProvider.addPendingChange(
+          'quizzes/${updatedQuiz.id}', quizData);
+      debugPrint(
+          'Update action added to sync queue for quiz: ${updatedQuiz.id}');
 
       // If online, attempt immediate Firebase update (fire-and-forget)
       if (connectivityProvider.isConnected) {
-        debugPrint('Attempting immediate Firebase update for quiz: ${updatedQuiz.id}');
+        debugPrint(
+            'Attempting immediate Firebase update for quiz: ${updatedQuiz.id}');
         // Mark as synced before sending
         quizData['synced'] = true;
-        _database.child('quizzes').child(updatedQuiz.id).set(quizData).then((_) {
+        _database
+            .child('quizzes')
+            .child(updatedQuiz.id)
+            .set(quizData)
+            .then((_) {
           debugPrint('Quiz updated in Firebase: ${updatedQuiz.id}');
           // No need to update local storage here, sync will handle it
         }).catchError((e) {
@@ -1281,12 +1325,98 @@ class QuizProvider with ChangeNotifier {
           // SyncProvider will handle retries
         });
       }
-
     } catch (e) {
       _setError('Failed to update quiz: ${e.toString()}');
     } finally {
       _isLoading = false;
       // notifyListeners(); // Already notified when updating local lists
+    }
+  }
+
+  Future<void> addQuiz(QuizData quiz) async {
+    try {
+      if (await _storageService.isOnline()) {
+        // Добавление в Firebase
+        await FirebaseFirestore.instance
+            .collection('quizzes')
+            .doc(quiz.id)
+            .set(quiz.toJson());
+      }
+
+      // Добавление локально
+      _quizzesData.add(quiz);
+      await _storageService.saveQuizData(_quizzesData);
+      notifyListeners();
+    } catch (e) {
+      print('Error adding quiz: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateQuizData(QuizData quiz) async {
+    try {
+      if (await _storageService.isOnline()) {
+        // Обновление в Firebase
+        await FirebaseFirestore.instance
+            .collection('quizzes')
+            .doc(quiz.id)
+            .update(quiz.toJson());
+      }
+
+      // Обновление локально
+      final index = _quizzesData.indexWhere((q) => q.id == quiz.id);
+      if (index != -1) {
+        _quizzesData[index] = quiz;
+        await _storageService.saveQuizData(_quizzesData);
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Error updating quiz: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteQuizData(String quizId) async {
+    try {
+      if (await _storageService.isOnline()) {
+        // Удаление из Firebase
+        await FirebaseFirestore.instance
+            .collection('quizzes')
+            .doc(quizId)
+            .delete();
+      }
+
+      // Удаление локально
+      _quizzesData.removeWhere((quiz) => quiz.id == quizId);
+      await _storageService.saveQuizData(_quizzesData);
+      notifyListeners();
+    } catch (e) {
+      print('Error deleting quiz: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> syncWithServer() async {
+    if (!await _storageService.isOnline()) {
+      throw Exception('No internet connection');
+    }
+
+    try {
+      // Загрузка всех данных с сервера
+      final snapshot =
+          await FirebaseFirestore.instance.collection('quizzes').get();
+      final serverQuizzes = snapshot.docs
+          .map((doc) => QuizData.fromJson({...doc.data(), 'id': doc.id}))
+          .toList();
+
+      // Обновление локальных данных
+      _quizzesData = serverQuizzes;
+      await _storageService.saveQuizData(_quizzesData);
+      _isOffline = false;
+      notifyListeners();
+    } catch (e) {
+      print('Error syncing with server: $e');
+      rethrow;
     }
   }
 }
